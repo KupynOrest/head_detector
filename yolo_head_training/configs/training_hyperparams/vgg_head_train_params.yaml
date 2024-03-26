@@ -5,7 +5,7 @@ defaults:
 warmup_mode: "LinearBatchLRWarmup"
 warmup_initial_lr:  1e-6
 lr_warmup_steps: 128
-lr_warmup_epochs:
+lr_warmup_epochs: 1
 
 initial_lr:  2e-3
 lr_mode: cosine
