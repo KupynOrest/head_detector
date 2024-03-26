@@ -16,7 +16,7 @@ from super_gradients.training.datasets.pose_estimation_datasets.abstract_pose_es
 from super_gradients.training.samples import PoseEstimationSample
 from super_gradients.training.transforms.keypoint_transforms import AbstractKeypointTransform
 
-from yolo_head_training.yolo_head.dataset_parsing import read_annotation, SampleAnnotation
+from yolo_head.dataset_parsing import read_annotation, SampleAnnotation
 
 logger = get_logger(__name__)
 

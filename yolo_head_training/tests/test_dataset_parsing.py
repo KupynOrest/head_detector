@@ -5,7 +5,7 @@ import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 
-from yolo_head_training.yolo_head.dataset_parsing import (
+from yolo_head.dataset_parsing import (
     read_annotation,
     draw_face_keypoints_skeleton,
     draw_2d_keypoints,
