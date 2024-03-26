@@ -1,3 +1,6 @@
+tensorboard-daemon:
+	nohup tensorboard --logdir=./checkpoints --host 0.0.0.0 --port 7777 > /dev/null 2>&1 &
+
 yolo_3dheads_m:
 	python train.py --config-name=yolo_3dheads_m \
     dataset_params.train_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/train \
