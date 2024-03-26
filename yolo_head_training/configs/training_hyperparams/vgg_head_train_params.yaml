@@ -5,18 +5,18 @@ defaults:
 warmup_mode: "LinearBatchLRWarmup"
 warmup_initial_lr:  1e-6
 lr_warmup_steps: 128
-lr_warmup_epochs: 10
+lr_warmup_epochs:
 
 initial_lr:  2e-3
 lr_mode: cosine
 cosine_final_lr_ratio: 0.05
-max_epochs: 1000
+max_epochs: 100
 
 zero_weight_decay_on_bias_and_bn: True
 batch_accumulate: 1
 
 average_best_models: True
-save_ckpt_epoch_list: [100,200,300,400,500]
+save_ckpt_epoch_list:
 
 loss: yolo_nas_pose_loss
 
@@ -94,15 +94,15 @@ phase_callbacks:
         pre_nms_max_predictions: 300
         post_nms_max_predictions: 30
 
-  - EarlyStop:
-      phase:
-        _target_: super_gradients.training.utils.callbacks.base_callbacks.Phase
-        value: VALIDATION_EPOCH_END
-      monitor: AP
-      mode: max
-      min_delta: 0.0001
-      patience: 100
-      verbose: True
+#  - EarlyStop:
+#      phase:
+#        _target_: super_gradients.training.utils.callbacks.base_callbacks.Phase
+#        value: VALIDATION_EPOCH_END
+#      monitor: AP
+#      mode: max
+#      min_delta: 0.0001
+#      patience: 100
+#      verbose: True
 
 pre_prediction_callback:
 
