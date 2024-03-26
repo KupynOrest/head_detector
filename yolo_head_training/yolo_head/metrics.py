@@ -4,6 +4,7 @@ from typing import Callable, Any, Dict, Union, List, Tuple
 import numpy as np
 import torch
 import torch.nn
+from scipy.optimize import linear_sum_assignment
 from super_gradients.common.registry import register_metric
 from super_gradients.module_interfaces import AbstractPoseEstimationPostPredictionCallback, PoseEstimationPredictions
 from super_gradients.training.metrics.pose_estimation_utils import compute_oks
@@ -47,20 +48,22 @@ def match_poses(
         oks_sigmas = torch.from_numpy(oks_sigmas)
     if not torch.is_tensor(true_bboxes_xywh):
         true_bboxes_xywh = torch.from_numpy(true_bboxes_xywh)
-    iou = compute_oks(
+    iou:np.ndarray = compute_oks(
         pred_joints=pred_poses,
         gt_joints=true_poses[..., :-1],
         gt_bboxes=true_bboxes_xywh,
         gt_keypoint_visibility=true_poses[..., -1],
         sigmas=oks_sigmas,
-    )
-    # Get matches
-    matches = torch.where(iou >= min_oks)
-    tp_matches = list(zip(matches[0].tolist(), matches[1].tolist()))
-    # Get false positives
-    fp_indexes = list(set(range(len(pred_poses))) - set(matches[0].tolist()))
-    # Get false negatives
-    fn_indexes = list(set(range(len(true_poses))) - set(matches[1].tolist()))
+    ).cpu().numpy()
+
+    # One gt pose can be matched to one pred pose and best match (in terms of IoU) is selected.
+    row_ind, col_ind = linear_sum_assignment(iou, maximize=True)
+    tp_matches = []
+    for r, c in zip(row_ind, col_ind):
+        if iou[r, c] >= min_oks:
+            tp_matches.append((r, c))
+    fp_indexes = [i for i in range(pred_poses.shape[0]) if i not in col_ind]
+    fn_indexes = [i for i in range(true_poses.shape[0]) if i not in row_ind]
     return PosesMatchingResult(tp_matches=tp_matches, fp_indexes=fp_indexes, fn_indexes=fn_indexes)
 
 
