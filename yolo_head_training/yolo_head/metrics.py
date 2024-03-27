@@ -189,7 +189,7 @@ class KeypointsFailureRate(Metric):
     def compute(self) -> torch.Tensor:
         acc = self.total_tp / self.total
         failure_rate = self.failure_rate / self.total_tp
-        return failure_rate / (acc + 1e-6) if acc > 0 else 1.0
+        return (failure_rate / acc) if acc > 0 else 1.0
 
 
 @register_metric()
@@ -269,4 +269,4 @@ class KeypointsNME(Metric):
         """
         acc = self.total_tp / self.total
         nme = self.weight * (self.nme / self.total_tp)
-        return nme / acc if acc > 0 else self.weight
+        return (nme / acc) if acc > 0 else self.weight
