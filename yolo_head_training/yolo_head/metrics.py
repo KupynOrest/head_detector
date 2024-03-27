@@ -137,6 +137,7 @@ class KeypointsFailureRate(Metric):
         self.below = below
         self.add_state("failure_rate", default=torch.tensor(0.0), dist_reduce_fx="sum")
         self.add_state("total", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state("total_tp", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
     def update(
             self,
