@@ -22,10 +22,7 @@ class PosesMatchingResult:
     fn_indexes: List[int]
 
 
-def match_poses(
-        pred_poses: np.ndarray, true_poses: np.ndarray, true_bboxes_xywh: np.ndarray, min_oks: float,
-        oks_sigmas: np.ndarray
-) -> PosesMatchingResult:
+def match_poses(pred_poses: np.ndarray, true_poses: np.ndarray, true_bboxes_xywh: np.ndarray, min_oks: float, oks_sigmas: np.ndarray) -> PosesMatchingResult:
     """
     Match two sets of poses based on the OKS metric.
     A tp match is a pair of indexes of a predicted pose and a ground truth pose, which are considered to be matched.
@@ -49,13 +46,17 @@ def match_poses(
         oks_sigmas = torch.from_numpy(oks_sigmas)
     if not torch.is_tensor(true_bboxes_xywh):
         true_bboxes_xywh = torch.from_numpy(true_bboxes_xywh)
-    iou: np.ndarray = compute_oks(
-        pred_joints=pred_poses,
-        gt_joints=true_poses[..., :-1],
-        gt_bboxes=true_bboxes_xywh,
-        gt_keypoint_visibility=true_poses[..., -1],
-        sigmas=oks_sigmas,
-    ).cpu().numpy()
+    iou: np.ndarray = (
+        compute_oks(
+            pred_joints=pred_poses,
+            gt_joints=true_poses[..., :-1],
+            gt_bboxes=true_bboxes_xywh,
+            gt_keypoint_visibility=true_poses[..., -1],
+            sigmas=oks_sigmas,
+        )
+        .cpu()
+        .numpy()
+    )
 
     # One gt pose can be matched to one pred pose and best match (in terms of IoU) is selected.
     row_ind, col_ind = linear_sum_assignment(iou, maximize=True)
@@ -68,9 +69,7 @@ def match_poses(
     return PosesMatchingResult(tp_matches=tp_matches, fp_indexes=fp_indexes, fn_indexes=fn_indexes)
 
 
-def metrics_w_bbox_wrapper(
-        outputs: Tensor, gts: Union[Tensor, Dict[str, Tensor]], function: Callable, *args: Any, **kwargs: Any
-) -> Tensor:
+def metrics_w_bbox_wrapper(outputs: Tensor, gts: Union[Tensor, Dict[str, Tensor]], function: Callable, *args: Any, **kwargs: Any) -> Tensor:
     gt_bboxes = gts["bboxes"] if "bboxes" in gts.keys() else None
     gt_keypoints = gts["keypoints"]
     if not torch.is_tensor(gt_bboxes):
@@ -81,10 +80,10 @@ def metrics_w_bbox_wrapper(
 
 
 def keypoints_nme(
-        output_kp: Tensor,
-        target_kp: Tensor,
-        bboxes_xywh: Tensor = None,
-        reduce: str = "mean",
+    output_kp: Tensor,
+    target_kp: Tensor,
+    bboxes_xywh: Tensor = None,
+    reduce: str = "mean",
 ) -> Tensor:
     """
     https://arxiv.org/pdf/1708.07517v2.pdf
@@ -99,11 +98,11 @@ def keypoints_nme(
 
 
 def percentage_of_errors_below_IOD(
-        output_kp: Tensor,
-        target_kp: Tensor,
-        bbox: Tensor = None,
-        threshold: float = 0.05,
-        below: bool = True,
+    output_kp: Tensor,
+    target_kp: Tensor,
+    bbox: Tensor = None,
+    threshold: float = 0.05,
+    below: bool = True,
 ) -> Tensor:
     """
     https://arxiv.org/pdf/1708.07517v2.pdf
@@ -120,12 +119,12 @@ class KeypointsFailureRate(Metric):
     """Compute the Failure Rate metric for [2/3]D keypoints with averaging across individual examples."""
 
     def __init__(
-            self,
-            post_prediction_callback: AbstractPoseEstimationPostPredictionCallback,
-            oks_sigmas: np.ndarray,
-            oks_threshold: float = 0.05,
-            threshold: float = 0.05,
-            below: bool = True,
+        self,
+        post_prediction_callback: AbstractPoseEstimationPostPredictionCallback,
+        oks_sigmas: np.ndarray,
+        oks_threshold: float = 0.05,
+        threshold: float = 0.05,
+        below: bool = True,
     ):
         super().__init__(
             dist_sync_on_step=False,
@@ -140,10 +139,10 @@ class KeypointsFailureRate(Metric):
         self.add_state("total_tp", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
     def update(
-            self,
-            preds: Any,
-            target: Any,
-            gt_samples: List[PoseEstimationSample],
+        self,
+        preds: Any,
+        target: Any,
+        gt_samples: List[PoseEstimationSample],
     ) -> None:
         """
         Update state with predictions and targets.
@@ -189,7 +188,7 @@ class KeypointsFailureRate(Metric):
     def compute(self) -> torch.Tensor:
         acc = self.total_tp / self.total
         failure_rate = self.failure_rate / self.total_tp
-        return (failure_rate / acc) if acc > 0 else 1.0
+        return (failure_rate / acc) if acc > 0 else torch.tensor(1, dtype=torch.float32, device=self.device)
 
 
 @register_metric()
@@ -199,11 +198,11 @@ class KeypointsNME(Metric):
     """
 
     def __init__(
-            self,
-            post_prediction_callback: AbstractPoseEstimationPostPredictionCallback,
-            oks_sigmas: np.ndarray,
-            oks_threshold: float = 0.05,
-            weight: int = 100,
+        self,
+        post_prediction_callback: AbstractPoseEstimationPostPredictionCallback,
+        oks_sigmas: np.ndarray,
+        oks_threshold: float = 0.05,
+        weight: int = 100,
     ):
         super().__init__(
             compute_on_step=False,
@@ -219,10 +218,10 @@ class KeypointsNME(Metric):
         self.add_state("total_tp", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
     def update(
-            self,
-            preds: Any,
-            target: Any,
-            gt_samples: List[PoseEstimationSample],
+        self,
+        preds: Any,
+        target: Any,
+        gt_samples: List[PoseEstimationSample],
     ) -> None:
         """
         Update state with predictions and targets.
@@ -269,4 +268,4 @@ class KeypointsNME(Metric):
         """
         acc = self.total_tp / self.total
         nme = self.weight * (self.nme / self.total_tp)
-        return (nme / acc) if acc > 0 else self.weight
+        return (nme / acc) if acc > 0 else torch.tensor(self.weight, dtype=torch.float32, device=self.device)
