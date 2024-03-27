@@ -9,7 +9,6 @@ from super_gradients.common.decorators.factory_decorator import resolve_param
 from super_gradients.common.factories.transforms_factory import TransformsFactory
 from super_gradients.common.object_names import Processings
 from super_gradients.common.registry.registry import register_dataset
-from super_gradients.training.datasets.data_formats.bbox_formats.xywh import xyxy_to_xywh
 from super_gradients.training.datasets.pose_estimation_datasets.abstract_pose_estimation_dataset import (
     AbstractPoseEstimationDataset,
 )
@@ -89,9 +88,7 @@ class DAD3DHeadsDataset(AbstractPoseEstimationDataset):
 
         gt_joints = np.array(gt_joints).reshape(-1, 68, 2)
         # Add a 1 to the last dimension to get [N, 68, 3]
-        gt_joints = np.concatenate(
-            [gt_joints, np.ones((gt_joints.shape[0], gt_joints.shape[1], 1), dtype=gt_joints.dtype)], axis=-1
-        )
+        gt_joints = np.concatenate([gt_joints, np.ones((gt_joints.shape[0], gt_joints.shape[1], 1), dtype=gt_joints.dtype)], axis=-1)
 
         return PoseEstimationSample(
             image=image,
