@@ -181,10 +181,10 @@ class KeypointsFailureRate(Metric):
                     threshold=self.threshold,
                     below=self.below,
                 )
-                self.total_tp += 1
+                self.total_tp += 1.0
 
             total = len(match_result.fp_indexes) + len(match_result.fn_indexes) + len(match_result.tp_matches)
-            self.total += total
+            self.total += float(total)
 
     def compute(self) -> torch.Tensor:
         acc = self.total_tp / self.total
@@ -258,10 +258,10 @@ class KeypointsNME(Metric):
                         "bboxes": gt_samples[image_index].bboxes_xywh[true_index],
                     },
                 )
-                self.total_tp += 1
+                self.total_tp += 1.0
 
             total = len(match_result.fp_indexes) + len(match_result.fn_indexes) + len(match_result.tp_matches)
-            self.total += total
+            self.total += float(total)
 
     def compute(self) -> torch.Tensor:
         """
