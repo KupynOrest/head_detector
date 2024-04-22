@@ -104,6 +104,8 @@ class KeypointsFailureRate(Metric):
             self.total += float(total)
 
     def compute(self) -> torch.Tensor:
-        acc = self.total_tp / self.total
+        total = int(self.total)
+        total_tp = int(self.total_tp)
+        acc = total_tp / total if total else 0
         failure_rate = self.failure_rate / self.total_tp
         return (failure_rate / acc) if acc > 0 else torch.tensor(1, dtype=torch.float32, device=self.device)

@@ -109,6 +109,9 @@ class KeypointsNME(Metric):
         """
         Computes accuracy over state.
         """
-        acc = self.total_tp / self.total
+        total = int(self.total)
+        total_tp = int(self.total_tp)
+        acc = total_tp / total if total else 0
+
         nme = self.weight * (self.nme / self.total_tp)
         return (nme / acc) if acc > 0 else torch.tensor(self.weight, dtype=torch.float32, device=self.device)
