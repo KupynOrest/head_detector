@@ -53,15 +53,10 @@ class YoloHeadsPostPredictionCallback(AbstractPoseEstimationPostPredictionCallba
 
         decoded_predictions: List[YoloHeadsPredictions] = []
 
-        predicted_3d_vertices = reproject_spatial_vertices(
-            self.flame, predictions.flame_params.detach().cpu().float(), to_2d=False, subset_indexes=self.indexes_subset
-        )
-
         for pred_bboxes_xyxy, pred_bboxes_conf, pred_flame_params, pred_3d_vertices in zip(
-            predictions.boxes_xyxy.detach().cpu(),
-            predictions.scores.detach().cpu(),
+            predictions.boxes_xyxy.detach().cpu().float(),
+            predictions.scores.detach().cpu().float(),
             predictions.flame_params.detach().cpu().float(),
-            predicted_3d_vertices.detach().cpu(),
         ):
             # pred_bboxes [Anchors, 4] in XYXY format
             # pred_scores [Anchors, 1] confidence scores [0..1]
@@ -71,10 +66,9 @@ class YoloHeadsPostPredictionCallback(AbstractPoseEstimationPostPredictionCallba
             pred_bboxes_conf = pred_bboxes_conf.squeeze(-1)  # [Anchors]
             conf_mask = pred_bboxes_conf >= self.pose_confidence_threshold  # [Anchors]
 
-            pred_bboxes_conf = pred_bboxes_conf[conf_mask].float()
-            pred_bboxes_xyxy = pred_bboxes_xyxy[conf_mask].float()
-            pred_3d_vertices = pred_3d_vertices[conf_mask].float()
-            pred_flame_params = pred_flame_params[conf_mask].float()
+            pred_bboxes_conf = pred_bboxes_conf[conf_mask]
+            pred_bboxes_xyxy = pred_bboxes_xyxy[conf_mask]
+            pred_flame_params = pred_flame_params[conf_mask]
 
             # Filter all predictions by self.nms_top_k
             if pred_bboxes_conf.size(0) > self.pre_nms_max_predictions:
@@ -90,7 +84,8 @@ class YoloHeadsPostPredictionCallback(AbstractPoseEstimationPostPredictionCallba
             final_bboxes = pred_bboxes_xyxy[idx_to_keep][: self.post_nms_max_predictions]  # [Instances, 4]
             final_scores = pred_bboxes_conf[idx_to_keep][: self.post_nms_max_predictions]  # [Instances, 1]
             final_params = pred_flame_params[idx_to_keep][: self.post_nms_max_predictions]  # [Instances, Flame Params]
-            final_3d_pts = pred_3d_vertices[idx_to_keep][: self.post_nms_max_predictions]  # [Instances, Vertices, 3]
+
+            final_3d_pts = reproject_spatial_vertices(self.flame, final_params, to_2d=True, subset_indexes=self.indexes_subset)
             final_2d_pts = final_3d_pts[..., :2]
 
             p = YoloHeadsPredictions(

@@ -2,19 +2,25 @@ import torch
 from super_gradients.training.utils import HpmStruct
 
 from yolo_head import YoloHeads_M, YoloHeads, YoloHeadsPostPredictionCallback
-from yolo_head.flame import FLAMELayer, FLAME_CONSTS, FlameParams, reproject_vertices, \
-    get_445_keypoints_indexes
+from yolo_head.flame import FLAMELayer, FLAME_CONSTS, FlameParams, \
+    get_445_keypoints_indexes, reproject_spatial_vertices
 
 
 def test_flame():
     flame = FLAMELayer(consts=FLAME_CONSTS)
     params = torch.randn(1, 300 + 100 + 6 + 3 + 1 + 3)
-    flame_params = FlameParams.from_3dmm(params, FLAME_CONSTS)
 
-    predicted_3d_vertices = reproject_vertices(flame, flame_params, to_2d=False)
+    predicted_3d_vertices = reproject_spatial_vertices(flame, params, to_2d=False)
     predicted_2d_vertices = predicted_3d_vertices[..., :2]
     print(predicted_2d_vertices.size())
 
+
+def test_flame_reproject():
+    flame = FLAMELayer(consts=FLAME_CONSTS)
+    num_flame_params = 300 + 100 + 6 + 3 + 1 + 3
+    params = torch.zeros((0, num_flame_params))
+    x = reproject_spatial_vertices(flame, params)
+    print(x.size())
 
 def test_get_445_keypoints():
     indexes = get_445_keypoints_indexes()

@@ -347,12 +347,17 @@ def reproject_spatial_vertices(flame: FLAMELayer, flame_params: Tensor, to_2d: b
     shape = flame_params.size()
     # Flatten all dimensions except the last one
     flame_params_bac = einops.rearrange(flame_params, "... F -> (...) F")
-    flame_params_inp = FlameParams.from_3dmm(flame_params_bac, FLAME_CONSTS)
-    pred_vertices = flame(flame_params_inp, zero_rot=False)
-    scale = torch.clamp(flame_params_inp.scale[:, None] + 1.0, 1e-8)
-    translation = flame_params_inp.translation[:, None, :]
 
-    projected_vertices = (pred_vertices + translation) * scale
+    # If there are no flame parameters, return zeros
+    if flame_params_bac.size(0) == 0:
+        projected_vertices = torch.zeros((0,) + (flame.v_template.size(0), 2 if to_2d else 3), device=flame_params.device)
+    else:
+        flame_params_inp = FlameParams.from_3dmm(flame_params_bac, FLAME_CONSTS)
+        pred_vertices = flame(flame_params_inp, zero_rot=False)
+        scale = torch.clamp(flame_params_inp.scale[:, None] + 1.0, 1e-8)
+        translation = flame_params_inp.translation[:, None, :]
+
+        projected_vertices = (pred_vertices + translation) * scale
 
     if subset_indexes is not None:
         projected_vertices = projected_vertices[:, subset_indexes]
