@@ -150,7 +150,7 @@ class HeadAnnotation:
             ]
         )
 
-    def get_points_in_absolute_coords(self):
+    def get_68_face_landmarks_in_absolute_coords(self):
         return self.points + np.array(self.extended_bbox[:2])
 
     def get_reprojected_points_in_absolute_coords(self):

@@ -1,5 +1,5 @@
 tensorboard-daemon:
-	nohup tensorboard --logdir=./checkpoints --host 0.0.0.0 --port 7777 > /dev/null 2>&1 &
+	nohup tensorboard --logdir=./checkpoints --host 0.0.0.0 --port 8888 > /dev/null 2>&1 &
 
 all: yolo_3dheads_m yolo_3dheads_m_mixup yolo_3dheads_m_mosaic
 

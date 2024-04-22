@@ -12,6 +12,7 @@ from yolo_head.dataset_parsing import (
     FACE_KEYPOINTS_FLIP_INDEXES,
     FACE_KEYPOINTS_SKELETON,
 )
+from yolo_head.flame import get_445_keypoints_indexes
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -44,13 +45,28 @@ def test_draw_reprojected_points():
     plt.savefig("head_get_reprojected_points_in_absolute_coords.jpg")
     plt.show()
 
+def test_draw_selected_points():
+    image = cv2.imread(os.path.join(CURRENT_DIR, "1.jpg"))
+    ann = read_annotation(os.path.join(CURRENT_DIR, "1.json"))
+    indexes = get_445_keypoints_indexes()
+
+    for head in ann.heads:
+        pts = head.get_reprojected_points_in_absolute_coords()
+        image = draw_2d_keypoints(image, pts[indexes])
+
+    plt.figure(figsize=(8, 8))
+    plt.imshow(image[:, :, ::-1])
+    plt.tight_layout()
+    plt.savefig("test_draw_selected_points.jpg")
+    plt.show()
+
 
 def test_draw_points():
     image = cv2.imread(os.path.join(CURRENT_DIR, "1.jpg"))
     ann = read_annotation(os.path.join(CURRENT_DIR, "1.json"))
 
     for head in ann.heads:
-        points = head.get_points_in_absolute_coords()
+        points = head.get_68_face_landmarks_in_absolute_coords()
         image = draw_face_keypoints_skeleton(image, points)
         image = draw_2d_keypoints(image, points)
         image = draw_bbox(image, head.get_face_bbox_xyxy(), color=(0, 255, 0))

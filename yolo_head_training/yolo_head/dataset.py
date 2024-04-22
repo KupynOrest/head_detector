@@ -1,5 +1,5 @@
 import os
-from typing import Tuple, List, Union
+from typing import List
 
 import cv2
 import numpy as np
@@ -16,6 +16,7 @@ from super_gradients.training.samples import PoseEstimationSample
 from super_gradients.training.transforms.keypoint_transforms import AbstractKeypointTransform
 
 from yolo_head.dataset_parsing import read_annotation, SampleAnnotation
+from yolo_head.flame import get_445_keypoints_indexes
 
 logger = get_logger(__name__)
 
@@ -28,17 +29,11 @@ class DAD3DHeadsDataset(AbstractPoseEstimationDataset):
         data_dir: str,
         num_joints: int,
         transforms: List[AbstractKeypointTransform],
-        edge_links: Union[List[Tuple[int, int]], np.ndarray],
-        edge_colors: Union[List[Tuple[int, int, int]], np.ndarray, None],
-        keypoint_colors: Union[List[Tuple[int, int, int]], np.ndarray, None],
     ):
         """
 
         :param data_dir:                     Root directory of the COCO dataset
         :param transforms:                   Transforms to be applied to the image & keypoints
-        :param edge_links:                   Edge links between joints
-        :param edge_colors:                  Color of the edge links. If None, the color will be generated randomly.
-        :param keypoint_colors:              Color of the keypoints. If None, the color will be generated randomly.
 
         """
         images = fs.find_images_in_dir(os.path.join(data_dir, "images"))
@@ -51,12 +46,13 @@ class DAD3DHeadsDataset(AbstractPoseEstimationDataset):
         super().__init__(
             transforms=transforms,
             num_joints=num_joints,
-            edge_links=edge_links,
-            edge_colors=edge_colors,
-            keypoint_colors=keypoint_colors,
+            edge_links=[],
+            edge_colors=[],
+            keypoint_colors=[(0, 255, 0)] * num_joints,
         )
         self.images = np.array(images)
         self.ann_files = np.array(ann_files)
+        self.indexes_subset = get_445_keypoints_indexes()
 
     def __len__(self):
         return len(self.images)
@@ -79,15 +75,16 @@ class DAD3DHeadsDataset(AbstractPoseEstimationDataset):
         gt_bboxes_xywh = []
 
         for head in head_ann.heads:
-            gt_joints.append(head.get_points_in_absolute_coords())
+            coords = head.get_reprojected_points_in_absolute_coords()
+            gt_joints.append(coords[self.indexes_subset])
             gt_bboxes_xywh.append(head.get_face_bbox_xywh())
 
         gt_bboxes_xywh = np.array(gt_bboxes_xywh)
         gt_iscrowd = np.zeros(len(gt_joints), dtype=bool)
         gt_areas = np.prod(gt_bboxes_xywh[:, 2:], axis=1)
 
-        gt_joints = np.array(gt_joints).reshape(-1, 68, 2)
-        # Add a 1 to the last dimension to get [N, 68, 3]
+        gt_joints = np.stack(gt_joints)
+        # Add a 1 to the last dimension to get [N, Num Keypoints, 3]
         gt_joints = np.concatenate([gt_joints, np.ones((gt_joints.shape[0], gt_joints.shape[1], 1), dtype=gt_joints.dtype)], axis=-1)
 
         return PoseEstimationSample(
@@ -111,9 +108,6 @@ class DAD3DHeadsDataset(AbstractPoseEstimationDataset):
         params = dict(
             conf=0.5,
             image_processor={Processings.ComposeProcessing: {"processings": pipeline}},
-            edge_links=self.edge_links,
-            edge_colors=self.edge_colors,
-            keypoint_colors=self.keypoint_colors,
         )
         return params
 

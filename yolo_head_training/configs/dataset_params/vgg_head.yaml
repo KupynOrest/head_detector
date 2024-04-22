@@ -9,14 +9,10 @@ dataset_params_suffix: "${dataset_params.image_size}"
 train_dataset_params:
   data_dir: g:/VGGHead/train
   num_joints: ${dataset_params.num_joints}
-  edge_links: ${dataset_params.edge_links}
-  edge_colors: ${dataset_params.edge_colors}
-  keypoint_colors: ${dataset_params.keypoint_colors}
-
   transforms:
-    - KeypointsRandomHorizontalFlip:
-        flip_index: ${dataset_params.flip_indexes}
-        prob: 0.5
+#    - KeypointsRandomHorizontalFlip:
+#        flip_index: ${dataset_params.flip_indexes}
+#        prob: 0.5
 
     - KeypointsBrightnessContrast:
         brightness_range: [ 0.8, 1.2 ]
@@ -61,10 +57,6 @@ train_dataset_params:
 val_dataset_params:
   data_dir: g:/VGGHead/val
   num_joints: ${dataset_params.num_joints}
-  edge_links: ${dataset_params.edge_links}
-  edge_colors: ${dataset_params.edge_colors}
-  keypoint_colors: ${dataset_params.keypoint_colors}
-
   transforms:
     - KeypointsLongestMaxSize:
         max_height: ${dataset_params.image_size}
@@ -84,7 +76,7 @@ val_dataset_params:
 train_dataloader_params:
   dataset: DAD3DHeadsDataset
   shuffle: True
-  batch_size: 8
+  batch_size: 2
   num_workers: 8
   drop_last: True
   pin_memory: False
@@ -92,7 +84,7 @@ train_dataloader_params:
 
 val_dataloader_params:
   dataset: DAD3DHeadsDataset
-  batch_size: 8
+  batch_size: 2
   num_workers: 8
   drop_last: False
   pin_memory: False
