@@ -76,7 +76,7 @@ val_dataset_params:
 train_dataloader_params:
   dataset: DAD3DHeadsDataset
   shuffle: True
-  batch_size: 32
+  batch_size: 24
   num_workers: 8
   drop_last: True
   pin_memory: False
