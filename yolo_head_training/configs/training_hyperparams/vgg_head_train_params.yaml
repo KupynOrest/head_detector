@@ -30,8 +30,8 @@ criterion_params:
     dfl_loss_weight: 0.01
     pose_reg_loss_weight: 1.0
     pose_classification_loss_type: focal
-    rescale_pose_loss_with_assigned_score: True
-    assigner_multiply_by_pose_oks: True
+    rescale_pose_loss_with_assigned_score: False
+    assigner_multiply_by_pose_oks: False
 
 optimizer: AdamW
 optimizer_params:

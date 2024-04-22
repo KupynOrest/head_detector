@@ -17,7 +17,7 @@ from .yolo_head_ndfl_heads import YoloHeadsRawOutputs, YoloHeadsDecodedPredictio
 
 
 @dataclasses.dataclass
-class YoloNASPoseYoloNASPoseBoxesAssignmentResult:
+class YoloHeadsAssignmentResult:
     """
     This dataclass stores result of assignment of predicted boxes to ground truth boxes for YoloNASPose model.
     It produced by YoloNASPoseTaskAlignedAssigner and is used by YoloNASPoseLoss to compute the loss.
@@ -113,7 +113,7 @@ class YoloNASPoseTaskAlignedAssigner(nn.Module):
         gt_crowd: Tensor,
         pad_gt_mask: Tensor,
         bg_index: int,
-    ) -> YoloNASPoseYoloNASPoseBoxesAssignmentResult:
+    ) -> YoloHeadsAssignmentResult:
         """
         This code is based on https://github.com/fcjian/TOOD/blob/master/mmdet/core/bbox/assigners/task_aligned_assigner.py
 
@@ -157,7 +157,7 @@ class YoloNASPoseTaskAlignedAssigner(nn.Module):
             assigned_gt_index = torch.zeros([batch_size, num_anchors], dtype=torch.long, device=gt_labels.device)
             assigned_crowd = torch.zeros([batch_size, num_anchors], dtype=torch.bool, device=gt_labels.device)
 
-            return YoloNASPoseYoloNASPoseBoxesAssignmentResult(
+            return YoloHeadsAssignmentResult(
                 assigned_labels=assigned_labels,
                 assigned_bboxes=assigned_bboxes,
                 assigned_scores=assigned_scores,
@@ -232,7 +232,7 @@ class YoloNASPoseTaskAlignedAssigner(nn.Module):
         assigned_crowd = assigned_crowd.reshape([batch_size, num_anchors])
         assigned_scores = assigned_scores * assigned_crowd.eq(0).unsqueeze(-1)
 
-        return YoloNASPoseYoloNASPoseBoxesAssignmentResult(
+        return YoloHeadsAssignmentResult(
             assigned_labels=assigned_labels,
             assigned_bboxes=assigned_bboxes,
             assigned_scores=assigned_scores,
@@ -522,7 +522,7 @@ class YoloHeadsLoss(nn.Module):
         pred_pose_coords,
         stride_tensor,
         anchor_points,
-        assign_result: YoloNASPoseYoloNASPoseBoxesAssignmentResult,
+        assign_result: YoloHeadsAssignmentResult,
         assigned_scores_sum,
         reg_max: int,
     ):
