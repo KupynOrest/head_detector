@@ -8,7 +8,6 @@ from super_gradients.training.samples import PoseEstimationSample
 from torch import Tensor
 from torchmetrics import Metric
 
-from yolo_head.flame import FLAMELayer, FLAME_CONSTS
 from yolo_head.yolo_heads_post_prediction_callback import YoloHeadsPostPredictionCallback
 from yolo_head.yolo_heads_predictions import YoloHeadsPredictions
 from .functional import metrics_w_bbox_wrapper, match_head_boxes
@@ -43,6 +42,7 @@ class KeypointsFailureRate(Metric):
         below: bool = True,
     ):
         super().__init__(
+            compute_on_step=False,
             dist_sync_on_step=False,
         )
         self.post_prediction_callback = post_prediction_callback
@@ -73,13 +73,13 @@ class KeypointsFailureRate(Metric):
         predictions: List[YoloHeadsPredictions] = self.post_prediction_callback(preds)
         assert len(predictions) == len(gt_samples)
         for image_index in range(len(gt_samples)):
-            pred_mm_params = predictions[image_index].mm_params.cpu()
+            # pred_mm_params = predictions[image_index].mm_params.cpu()
             pred_bboxes_xyxy = predictions[image_index].bboxes_xyxy
-            pred_vertices_3d = predictions[image_index].predicted_3d_vertices.cpu()
+            # pred_vertices_3d = predictions[image_index].predicted_3d_vertices.cpu()
             pred_vertices_2d = predictions[image_index].predicted_2d_vertices.cpu()
 
-            true_bboxes_xywh = gt_samples[image_index].bboxes_xywh
-            true_mm_params = gt_samples[image_index].joints  # All but last column
+            true_bboxes_xywh = torch.from_numpy(gt_samples[image_index].bboxes_xywh)
+            true_keypoints = torch.from_numpy(gt_samples[image_index].joints)
 
             match_result = match_head_boxes(
                 pred_boxes_xyxy=pred_bboxes_xyxy,

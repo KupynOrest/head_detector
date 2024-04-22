@@ -3,11 +3,11 @@ defaults:
 
 
 warmup_mode: "LinearBatchLRWarmup"
-warmup_initial_lr:  1e-6
+warmup_initial_lr: 1e-6
 lr_warmup_steps: 128
 lr_warmup_epochs: 1
 
-initial_lr:  1e-4
+initial_lr: 1e-4
 lr_mode: cosine
 cosine_final_lr_ratio: 0.05
 max_epochs: 100
@@ -16,22 +16,22 @@ zero_weight_decay_on_bias_and_bn: True
 batch_accumulate: 1
 
 average_best_models: True
-save_ckpt_epoch_list: []
+save_ckpt_epoch_list: [ ]
 
 loss: YoloHeadsLoss
 
 criterion_params:
-    oks_sigma: ${dataset_params.oks_sigma}
-    num_joints: ${dataset_params.num_joints}
-    classification_loss_weight: 1.0
-    classification_loss_type: focal
-    regression_iou_loss_type: ciou
-    iou_loss_weight: 1.0
-    dfl_loss_weight: 0.01
-    pose_reg_loss_weight: 1.0
-    pose_classification_loss_type: focal
-    rescale_pose_loss_with_assigned_score: False
-    assigner_multiply_by_pose_oks: False
+  oks_sigma: ${dataset_params.oks_sigma}
+  num_joints: ${dataset_params.num_joints}
+  classification_loss_weight: 1.0
+  classification_loss_type: focal
+  regression_iou_loss_type: ciou
+  iou_loss_weight: 1.0
+  dfl_loss_weight: 0.01
+  pose_reg_loss_weight: 1.0
+  pose_classification_loss_type: focal
+  rescale_pose_loss_with_assigned_score: False
+  assigner_multiply_by_pose_oks: False
 
 optimizer: AdamW
 optimizer_params:
@@ -44,22 +44,23 @@ ema_params:
 
 mixed_precision: True
 sync_bn: False
-nvalid_metrics_list: []
-#  - KeypointsFailureRate:
-#      post_prediction_callback:
-#        _target_: yolo_head.yolo_heads_post_prediction_callback.YoloHeadsPostPredictionCallback
-#        confidence_threshold: 0.1
-#        nms_iou_threshold: 0.7
-#        pre_nms_max_predictions: 300
-#        post_nms_max_predictions: 30
 
-#  - KeypointsNME:
-#      post_prediction_callback:
-#        _target_: yolo_head.yolo_heads_post_prediction_callback.YoloHeadsPostPredictionCallback
-#        confidence_threshold: 0.1
-#        nms_iou_threshold: 0.7
-#        pre_nms_max_predictions: 300
-#        post_nms_max_predictions: 30
+valid_metrics_list:
+  - KeypointsFailureRate:
+      post_prediction_callback:
+        _target_: yolo_head.yolo_heads_post_prediction_callback.YoloHeadsPostPredictionCallback
+        confidence_threshold: 0.1
+        nms_iou_threshold: 0.7
+        pre_nms_max_predictions: 300
+        post_nms_max_predictions: 30
+
+  - KeypointsNME:
+      post_prediction_callback:
+        _target_: yolo_head.yolo_heads_post_prediction_callback.YoloHeadsPostPredictionCallback
+        confidence_threshold: 0.1
+        nms_iou_threshold: 0.7
+        pre_nms_max_predictions: 300
+        post_nms_max_predictions: 30
 
 #  - PoseEstimationMetrics:
 #      num_joints: ${dataset_params.num_joints}

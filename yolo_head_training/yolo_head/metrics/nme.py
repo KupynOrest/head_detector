@@ -1,21 +1,19 @@
-import dataclasses
-from typing import Callable, Any, Dict, Union, List, Tuple
+from typing import Any, List
 
-import numpy as np
 import torch
 import torch.nn
-from scipy.optimize import linear_sum_assignment
 from super_gradients.common.registry import register_metric
-from super_gradients.module_interfaces import AbstractPoseEstimationPostPredictionCallback, PoseEstimationPredictions
-from super_gradients.training.metrics.pose_estimation_utils import compute_oks
+from super_gradients.module_interfaces import AbstractPoseEstimationPostPredictionCallback
+from super_gradients.training.datasets.data_formats.bbox_formats.xywh import xywh_to_xyxy
 from super_gradients.training.samples import PoseEstimationSample
 from torch import Tensor
 from torchmetrics import Metric
 
+from yolo_head.flame import FLAMELayer, FLAME_CONSTS
+from .functional import metrics_w_bbox_wrapper, match_head_boxes
+from .. import YoloHeadsPostPredictionCallback
+from ..yolo_heads_predictions import YoloHeadsPredictions
 
-from yolo_head.flame import FLAMELayer, FLAME_CONSTS, FlameParams
-
-from .functional import match_poses, metrics_w_bbox_wrapper
 
 def keypoints_nme(
     output_kp: Tensor,
@@ -34,6 +32,7 @@ def keypoints_nme(
         nme = torch.mean(nme)
     return nme
 
+
 @register_metric()
 class KeypointsNME(Metric):
     """Compute the NME Metric for [2/3]D keypoints with averaging across individual examples.
@@ -42,7 +41,8 @@ class KeypointsNME(Metric):
 
     def __init__(
         self,
-        post_prediction_callback: AbstractPoseEstimationPostPredictionCallback,
+        post_prediction_callback: YoloHeadsPostPredictionCallback,
+        min_iou: float = 0.5,
         weight: int = 100,
     ):
         super().__init__(
@@ -52,7 +52,7 @@ class KeypointsNME(Metric):
 
         self.weight = weight
         self.post_prediction_callback = post_prediction_callback
-        self.flame = FLAMELayer(FLAME_CONSTS)
+        self.min_iou = min_iou
         self.add_state("nme", default=torch.tensor(0.0), dist_reduce_fx="sum")
         self.add_state("total", default=torch.tensor(0.0), dist_reduce_fx="sum")
         self.add_state("total_tp", default=torch.tensor(0.0), dist_reduce_fx="sum")
@@ -74,28 +74,27 @@ class KeypointsNME(Metric):
 
         dim reflects 2D-3D mode.
         """
-        predictions: List[PoseEstimationPredictions] = self.post_prediction_callback(preds)
+        predictions: List[YoloHeadsPredictions] = self.post_prediction_callback(preds)
         assert len(predictions) == len(gt_samples)
-
         for image_index in range(len(gt_samples)):
-            mm_paramers = predictions[image_index].poses.cpu() # [N, NumParams]
-            flame_params = FlameParams.from_3dmm(mm_paramers, FLAME_CONSTS)
-            vertices3d = self.flame(flame_params)
+            # pred_mm_params = predictions[image_index].mm_params.cpu()
+            pred_bboxes_xyxy = predictions[image_index].bboxes_xyxy
+            # pred_vertices_3d = predictions[image_index].predicted_3d_vertices.cpu()
+            pred_vertices_2d = predictions[image_index].predicted_2d_vertices.cpu()
 
+            true_bboxes_xywh = torch.from_numpy(gt_samples[image_index].bboxes_xywh)
+            true_keypoints = torch.from_numpy(gt_samples[image_index].joints)
 
-            true_keypoints = gt_samples[image_index].joints  # All but last column
-            match_result = match_poses(
-                pred_poses=pred_keypoints,
-                true_poses=true_keypoints,
-                true_bboxes_xywh=gt_samples[image_index].bboxes_xywh,
-                min_oks=self.oks_threshold,
-                oks_sigmas=self.oks_sigmas,
+            match_result = match_head_boxes(
+                pred_boxes_xyxy=pred_bboxes_xyxy,
+                true_boxes_xyxy=xywh_to_xyxy(true_bboxes_xywh, image_shape=None),
+                min_iou=self.min_iou,
             )
 
             for pred_index, true_index in match_result.tp_matches:
                 self.nme += metrics_w_bbox_wrapper(
                     function=keypoints_nme,
-                    outputs=pred_keypoints[pred_index][..., 0:2],
+                    outputs=pred_vertices_2d[pred_index][..., 0:2],
                     gts={
                         "keypoints": true_keypoints[true_index][..., 0:2],
                         "bboxes": gt_samples[image_index].bboxes_xywh[true_index],
