@@ -53,7 +53,7 @@ class YoloHeadsPostPredictionCallback(AbstractPoseEstimationPostPredictionCallba
 
         decoded_predictions: List[YoloHeadsPredictions] = []
 
-        for pred_bboxes_xyxy, pred_bboxes_conf, pred_flame_params, pred_3d_vertices in zip(
+        for pred_bboxes_xyxy, pred_bboxes_conf, pred_flame_params in zip(
             predictions.boxes_xyxy.detach().cpu().float(),
             predictions.scores.detach().cpu().float(),
             predictions.flame_params.detach().cpu().float(),
