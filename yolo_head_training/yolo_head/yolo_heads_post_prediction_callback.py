@@ -5,8 +5,8 @@ import torchvision
 from super_gradients.module_interfaces import AbstractPoseEstimationPostPredictionCallback
 from torch import Tensor
 
-from .flame import FLAMELayer, FLAME_CONSTS, FlameParams, reproject_spatial_vertices, get_445_keypoints_indexes
-from .yolo_head_ndfl_heads import YoloHeadsDecodedPredictions
+from .flame import FLAMELayer, FLAME_CONSTS, reproject_spatial_vertices, get_445_keypoints_indexes
+from .yolo_head_ndfl_heads import YoloHeadsDecodedPredictions, YoloHeadsRawOutputs
 from .yolo_heads_predictions import YoloHeadsPredictions
 
 
@@ -41,7 +41,7 @@ class YoloHeadsPostPredictionCallback(AbstractPoseEstimationPostPredictionCallba
         self.indexes_subset = get_445_keypoints_indexes()
 
     @torch.no_grad()
-    def __call__(self, outputs: Tuple[Tuple[Tensor, Tensor, Tensor], ...]) -> List[YoloHeadsPredictions]:
+    def __call__(self, outputs: Tuple[YoloHeadsDecodedPredictions, YoloHeadsRawOutputs]) -> List[YoloHeadsPredictions]:
         """
         Take YoloNASPose's predictions and decode them into usable pose predictions.
 
@@ -75,7 +75,6 @@ class YoloHeadsPostPredictionCallback(AbstractPoseEstimationPostPredictionCallba
                 topk_candidates = torch.topk(pred_bboxes_conf, k=self.pre_nms_max_predictions, largest=True, sorted=True)
                 pred_bboxes_conf = pred_bboxes_conf[topk_candidates.indices]
                 pred_bboxes_xyxy = pred_bboxes_xyxy[topk_candidates.indices]
-                pred_3d_vertices = pred_3d_vertices[topk_candidates.indices]
                 pred_flame_params = pred_flame_params[topk_candidates.indices]
 
             # NMS
