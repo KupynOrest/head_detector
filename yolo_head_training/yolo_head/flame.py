@@ -354,10 +354,8 @@ def reproject_spatial_vertices(flame: FLAMELayer, flame_params: Tensor, to_2d: b
     else:
         flame_params_inp = FlameParams.from_3dmm(flame_params_bac, FLAME_CONSTS)
         pred_vertices = flame(flame_params_inp, zero_rot=False)
-        scale = torch.clamp(flame_params_inp.scale[:, None] + 1.0, 1e-8)
-        translation = flame_params_inp.translation[:, None, :]
-
-        projected_vertices = (pred_vertices + translation) * scale
+        scale = torch.clamp(flame_params_inp.scale[:, None], 1e-8)
+        projected_vertices = (pred_vertices * scale) + flame_params_inp.translation[:, None]  # [B, 1, 3]
 
     if subset_indexes is not None:
         projected_vertices = projected_vertices[:, subset_indexes]
