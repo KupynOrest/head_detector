@@ -44,8 +44,7 @@ ema_params:
 
 mixed_precision: True
 sync_bn: False
-
-valid_metrics_list: []
+nvalid_metrics_list: []
 #  - KeypointsFailureRate:
 #      post_prediction_callback:
 #        _target_: yolo_head.yolo_heads_post_prediction_callback.YoloHeadsPostPredictionCallback

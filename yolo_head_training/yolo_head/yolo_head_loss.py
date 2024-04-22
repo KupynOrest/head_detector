@@ -72,7 +72,7 @@ def batch_pose_oks(gt_keypoints: torch.Tensor, pred_keypoints: torch.Tensor, gt_
     return mean_oks
 
 
-class YoloNASPoseTaskAlignedAssigner(nn.Module):
+class YoloHeadsTaskAlignedAssigner(nn.Module):
     """
     Task-aligned assigner repurposed from YoloNAS for pose estimation task
 
@@ -82,30 +82,25 @@ class YoloNASPoseTaskAlignedAssigner(nn.Module):
     superior performance that the original approach.
     """
 
-    def __init__(self, sigmas: Tensor, topk: int = 13, alpha: float = 1.0, beta=6.0, eps=1e-9, multiply_by_pose_oks: bool = False):
+    def __init__(self, topk: int = 13, alpha: float = 1.0, beta=6.0, eps=1e-9):
         """
 
-        :param sigmas:               Sigmas for OKS calculation
         :param topk:                 Maximum number of anchors that is selected for each gt box
         :param alpha:                Power factor for class probabilities of predicted boxes (Used compute alignment metric)
         :param beta:                 Power factor for IoU score of predicted boxes (Used compute alignment metric)
         :param eps:                  Small constant for numerical stability
-        :param multiply_by_pose_oks: Whether to multiply alignment metric by pose OKS
         """
         super().__init__()
         self.topk = topk
         self.alpha = alpha
         self.beta = beta
         self.eps = eps
-        self.sigmas = sigmas
-        self.multiply_by_pose_oks = multiply_by_pose_oks
 
     @torch.no_grad()
     def forward(
         self,
         pred_scores: Tensor,
         pred_bboxes: Tensor,
-        pred_pose_coords: Tensor,
         anchor_points: Tensor,
         gt_labels: Tensor,
         gt_bboxes: Tensor,
@@ -145,7 +140,7 @@ class YoloNASPoseTaskAlignedAssigner(nn.Module):
         assert gt_labels.ndim == gt_bboxes.ndim and gt_bboxes.ndim == 3
 
         batch_size, num_anchors, num_classes = pred_scores.shape
-        _, _, num_keypoints, _ = pred_pose_coords.shape
+        _, _, num_keypoints, _ = gt_poses.shape
         _, num_max_boxes, _ = gt_bboxes.shape
 
         # negative batch
@@ -168,10 +163,6 @@ class YoloNASPoseTaskAlignedAssigner(nn.Module):
 
         # compute iou between gt and pred bbox, [B, n, L]
         ious = batch_iou_similarity(gt_bboxes, pred_bboxes)
-
-        if self.multiply_by_pose_oks:
-            pose_oks = batch_pose_oks(gt_poses, pred_pose_coords, gt_bboxes, self.sigmas.to(pred_pose_coords.device))
-            ious = ious * pose_oks
 
         # gather pred bboxes class score
         pred_scores = torch.permute(pred_scores, [0, 2, 1])
@@ -293,12 +284,10 @@ class YoloHeadsLoss(nn.Module):
         self.flame = FLAMELayer(FLAME_CONSTS)
         self.indexes_subset = get_445_keypoints_indexes()
 
-        self.assigner = YoloNASPoseTaskAlignedAssigner(
-            sigmas=self.oks_sigmas,
+        self.assigner = YoloHeadsTaskAlignedAssigner(
             topk=bbox_assigner_topk,
             alpha=bbox_assigned_alpha,
             beta=bbox_assigned_beta,
-            multiply_by_pose_oks=assigner_multiply_by_pose_oks,
         )
         self.pose_classification_loss_type = pose_classification_loss_type
         self.rescale_pose_loss_with_assigned_score = rescale_pose_loss_with_assigned_score
@@ -386,10 +375,7 @@ class YoloHeadsLoss(nn.Module):
         pred_distri = predictions.reg_distri_list
         stride_tensor = predictions.stride_tensor
         anchor_points = predictions.anchor_points
-
-        pred_pose_coords = reproject_spatial_vertices(self.flame, predictions.flame_params, to_2d=True)
-        # Use only relevant keypoints
-        pred_pose_coords = pred_pose_coords[:, :, self.indexes_subset, :]
+        pred_flame_params = predictions.flame_params
 
         targets = self._unpack_flat_targets(targets, batch_size=pred_scores.size(0))
 
@@ -406,7 +392,6 @@ class YoloHeadsLoss(nn.Module):
         assign_result = self.assigner(
             pred_scores=pred_scores.detach().sigmoid(),  # Pred scores are logits on training for numerical stability
             pred_bboxes=pred_bboxes.detach() * stride_tensor,
-            pred_pose_coords=pred_pose_coords.detach(),
             anchor_points=anchor_points,
             gt_labels=gt_labels,
             gt_bboxes=gt_bboxes,
@@ -436,7 +421,7 @@ class YoloHeadsLoss(nn.Module):
         loss_iou, loss_dfl, loss_pose_reg = self._bbox_loss(
             pred_distri,
             pred_bboxes,
-            pred_pose_coords=pred_pose_coords,
+            pred_flame_params=pred_flame_params,
             stride_tensor=stride_tensor,
             anchor_points=anchor_points_s,
             assign_result=assign_result,
@@ -519,7 +504,7 @@ class YoloHeadsLoss(nn.Module):
         self,
         pred_dist,
         pred_bboxes,
-        pred_pose_coords,
+        pred_flame_params,
         stride_tensor,
         anchor_points,
         assign_result: YoloHeadsAssignmentResult,
@@ -556,7 +541,8 @@ class YoloHeadsLoss(nn.Module):
             loss_dfl = loss_dfl.sum() / assigned_scores_sum
 
             # Do not divide poses by stride since this would skew the loss and make sigmas incorrect
-            pred_pose_coords = pred_pose_coords[mask_positive]
+            pred_flame_params = pred_flame_params[mask_positive]
+            pred_pose_coords = reproject_spatial_vertices(self.flame, pred_flame_params, to_2d=True, subset_indexes=self.indexes_subset)
 
             gt_pose_coords = assign_result.assigned_poses[..., 0:2][mask_positive]
 

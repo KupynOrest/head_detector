@@ -339,13 +339,14 @@ def rotation_mat_from_flame_params(flame_params):
     return rot_mat
 
 
-def reproject_spatial_vertices(flame: FLAMELayer, flame_params: Tensor, to_2d: bool = True) -> Tensor:
+def reproject_spatial_vertices(flame: FLAMELayer, flame_params: Tensor, to_2d: bool = True, subset_indexes=None) -> Tensor:
     """
-    :param flame_params: [B, Num Flame Params, A]
-    :return: [B, A, Num Vertices, 2] if to_2d else [B, A, Num Vertices, 3]
+    :param flame_params: [..., Num Flame Params]
+    :return: [..., Num Vertices, 2] if to_2d else [..., Num Vertices, 3]
     """
-    A = flame_params.size(2)
-    flame_params_bac = einops.rearrange(flame_params, "b c a -> (b a) c").contiguous()
+    shape = flame_params.size()
+    # Flatten all dimensions except the last one
+    flame_params_bac = einops.rearrange(flame_params, "... F -> (...) F")
     flame_params_inp = FlameParams.from_3dmm(flame_params_bac, FLAME_CONSTS)
     pred_vertices = flame(flame_params_inp, zero_rot=False)
     scale = torch.clamp(flame_params_inp.scale[:, None] + 1.0, 1e-8)
@@ -353,10 +354,13 @@ def reproject_spatial_vertices(flame: FLAMELayer, flame_params: Tensor, to_2d: b
 
     projected_vertices = (pred_vertices + translation) * scale
 
-    projected_vertices = einops.rearrange(projected_vertices, "(b a) v c -> b a v c", a=A).contiguous()
-
+    if subset_indexes is not None:
+        projected_vertices = projected_vertices[:, subset_indexes]
     if to_2d:
         projected_vertices = projected_vertices[..., :2]
+
+    # Reshape back to the original shape
+    projected_vertices = projected_vertices.view(*shape[:-1], *projected_vertices.size()[-2:]).contiguous()
     return projected_vertices
 
 

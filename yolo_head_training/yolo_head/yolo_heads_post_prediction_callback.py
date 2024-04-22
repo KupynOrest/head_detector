@@ -53,7 +53,9 @@ class YoloHeadsPostPredictionCallback(AbstractPoseEstimationPostPredictionCallba
 
         decoded_predictions: List[YoloHeadsPredictions] = []
 
-        predicted_3d_vertices = reproject_spatial_vertices(self.flame, predictions.flame_params.detach().cpu().float(), to_2d=False)
+        predicted_3d_vertices = reproject_spatial_vertices(
+            self.flame, predictions.flame_params.detach().cpu().float(), to_2d=False, subset_indexes=self.indexes_subset
+        )
 
         for pred_bboxes_xyxy, pred_bboxes_conf, pred_flame_params, pred_3d_vertices in zip(
             predictions.boxes_xyxy.detach().cpu(),
@@ -63,7 +65,7 @@ class YoloHeadsPostPredictionCallback(AbstractPoseEstimationPostPredictionCallba
         ):
             # pred_bboxes [Anchors, 4] in XYXY format
             # pred_scores [Anchors, 1] confidence scores [0..1]
-            # pred_flame_params [Flame Params, Anchors]
+            # pred_flame_params [Anchors, Flame Params]
             # pred_3d_vertices [Anchors, Vertices, 3]
 
             pred_bboxes_conf = pred_bboxes_conf.squeeze(-1)  # [Anchors]
@@ -72,7 +74,7 @@ class YoloHeadsPostPredictionCallback(AbstractPoseEstimationPostPredictionCallba
             pred_bboxes_conf = pred_bboxes_conf[conf_mask].float()
             pred_bboxes_xyxy = pred_bboxes_xyxy[conf_mask].float()
             pred_3d_vertices = pred_3d_vertices[conf_mask].float()
-            pred_flame_params = pred_flame_params[:, conf_mask].float()
+            pred_flame_params = pred_flame_params[conf_mask].float()
 
             # Filter all predictions by self.nms_top_k
             if pred_bboxes_conf.size(0) > self.pre_nms_max_predictions:
@@ -80,23 +82,23 @@ class YoloHeadsPostPredictionCallback(AbstractPoseEstimationPostPredictionCallba
                 pred_bboxes_conf = pred_bboxes_conf[topk_candidates.indices]
                 pred_bboxes_xyxy = pred_bboxes_xyxy[topk_candidates.indices]
                 pred_3d_vertices = pred_3d_vertices[topk_candidates.indices]
-                pred_flame_params = pred_flame_params[:, topk_candidates.indices]
+                pred_flame_params = pred_flame_params[topk_candidates.indices]
 
             # NMS
             idx_to_keep = torchvision.ops.boxes.nms(boxes=pred_bboxes_xyxy, scores=pred_bboxes_conf, iou_threshold=self.nms_iou_threshold)
 
             final_bboxes = pred_bboxes_xyxy[idx_to_keep][: self.post_nms_max_predictions]  # [Instances, 4]
             final_scores = pred_bboxes_conf[idx_to_keep][: self.post_nms_max_predictions]  # [Instances, 1]
+            final_params = pred_flame_params[idx_to_keep][: self.post_nms_max_predictions]  # [Instances, Flame Params]
             final_3d_pts = pred_3d_vertices[idx_to_keep][: self.post_nms_max_predictions]  # [Instances, Vertices, 3]
-            final_params = pred_flame_params[:, idx_to_keep][:, : self.post_nms_max_predictions]
             final_2d_pts = final_3d_pts[..., :2]
 
             p = YoloHeadsPredictions(
-                scores=final_scores[: self.post_nms_max_predictions],
-                bboxes_xyxy=final_bboxes[: self.post_nms_max_predictions],
+                scores=final_scores,
+                bboxes_xyxy=final_bboxes,
                 mm_params=final_params,
-                predicted_3d_vertices=final_3d_pts[:, self.indexes_subset],
-                predicted_2d_vertices=final_2d_pts[:, self.indexes_subset],
+                predicted_3d_vertices=final_3d_pts,
+                predicted_2d_vertices=final_2d_pts,
             )
 
             decoded_predictions.append(p)

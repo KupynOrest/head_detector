@@ -33,8 +33,10 @@ class YoloHeadsDecodedPredictions:
 @dataclasses.dataclass
 class YoloHeadsRawOutputs:
     """
-    :params flame_params: [B, Num Flame Params, Anchors]
+    :params flame_params: [B, Anchors, Num Flame Params]
+    :param flame_params: [B, Anchors, Flame Params] Predicted flame parameters
     """
+
     cls_score_list: Tensor
     reg_distri_list: Tensor
     flame_params: Tensor
@@ -170,8 +172,9 @@ class YoloHeadsNDFLHeads(BaseDetectionModule, SupportsReplaceNumClasses):
         flame_params_list = torch.cat(flame_params_list, dim=-1)  # [B, Num Flame Params, Anchors]
         flame_params = FlameParams.from_3dmm(flame_params_list, FLAME_CONSTS)
         flame_params.scale *= stride_tensor.view(1, 1, -1)
-        flame_params.translation[:, 0:2] += einops.rearrange(anchor_points_inference - self.grid_cell_offset, "a n -> 1 n a")
+        flame_params.translation[:, 0:2] += einops.rearrange(anchor_points_inference - self.grid_cell_offset, "A N -> 1 N A")
         flame_params = flame_params.to_3dmm_tensor()  # [B, Num Flame Params, Anchors]
+        flame_params = einops.rearrange(flame_params, "B F A -> B A F")  # Rearrange to common format where anchors comes first
 
         decoded_predictions = YoloHeadsDecodedPredictions(boxes_xyxy=pred_bboxes, scores=pred_scores, flame_params=flame_params)
 
