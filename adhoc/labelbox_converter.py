@@ -5,6 +5,55 @@ from typing import Dict, Any, List
 from fire import Fire
 from tqdm import tqdm
 
+import json
+import random
+from pycocotools.coco import COCO
+
+TRAIN_RATIO = 0.8
+
+
+def split_annotations(input_json, train_ratio=0.8):
+    # Initialize COCO object
+    coco = COCO(input_json)
+
+    # Get image IDs
+    image_ids = coco.getImgIds()
+
+    # Shuffle image IDs
+    random.shuffle(image_ids)
+
+    # Split image IDs into train and val sets
+    num_train = int(len(image_ids) * train_ratio)
+    train_image_ids = image_ids[:num_train]
+    val_image_ids = image_ids[num_train:]
+
+    # Get corresponding annotations for train and val sets
+    train_annotations = coco.loadAnns(coco.getAnnIds(imgIds=train_image_ids))
+    val_annotations = coco.loadAnns(coco.getAnnIds(imgIds=val_image_ids))
+
+    # Create COCO instances for train and val sets
+    train_coco = {
+        'info': coco.dataset['info'],
+        'licenses': coco.dataset['licenses'],
+        'images': coco.loadImgs(train_image_ids),
+        'annotations': train_annotations,
+        'categories': coco.dataset['categories']
+    }
+
+    val_coco = {
+        'info': coco.dataset['info'],
+        'licenses': coco.dataset['licenses'],
+        'images': coco.loadImgs(val_image_ids),
+        'annotations': val_annotations,
+        'categories': coco.dataset['categories']
+    }
+    return train_coco, val_coco
+
+
+def save_annotations(coco_instance, output_json):
+    with open(output_json, 'w') as f:
+        json.dump(coco_instance, f)
+
 
 class Labelbox2COCOConverter:
     @staticmethod
@@ -20,7 +69,10 @@ class Labelbox2COCOConverter:
                 return True
             for label in labels:
                 if len(label['annotations']['classifications']) > 0:
-                    return True
+                    label_names = [x['radio_answer']['name'] for x in label['annotations']['classifications']]
+                    for x in label_names:
+                        if x == 'No_Head_Visible':
+                            return False
                 if len(label['annotations']['objects']) == 0:
                     return True
         return False
@@ -76,6 +128,13 @@ def convert(labelbox_json_path: str, save_path: str) -> None:
     data = converter(labelbox_json_path)
     with open(os.path.join(save_path, "coco.json"), "w") as fd:
         json.dump(data, fd, indent=2, ensure_ascii=False)
+    train_annotations, val_annotations = split_annotations(os.path.join(save_path, "coco.json"), TRAIN_RATIO)
+
+    train_output_json = 'train_annotations.json'  # Path to save the train annotations file
+    val_output_json = 'val_annotations.json'  # Path to save the validation annotations file
+
+    save_annotations(train_annotations, os.path.join(save_path, train_output_json))
+    save_annotations(val_annotations, os.path.join(save_path, val_output_json))
 
 
 if __name__ == "__main__":

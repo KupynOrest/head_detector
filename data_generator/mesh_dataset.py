@@ -1,9 +1,8 @@
 import os
-import json
-from typing import Tuple, Union, Dict, Any
+import shutil
+from typing import Tuple, Union
 
 import cv2
-import torch
 import numpy as np
 from fire import Fire
 from tqdm import tqdm
@@ -57,13 +56,6 @@ def ensure_bbox_boundaries(bbox: np.array, img_shape: Tuple[int, int]) -> np.arr
     return np.array([x1, y1, w, h]).astype("int32")
 
 
-def process_result(result: Dict[str, Any]) -> Dict[str, Any]:
-    for key, value in result.items():
-        if isinstance(value, torch.Tensor) or isinstance(value, np.ndarray):
-            result[key] = value.squeeze().tolist()
-    return result
-
-
 def create_dataset(images_folder: str, coco_path: str, save_path: str):
     os.makedirs(os.path.join(save_path, "images"), exist_ok=True)
     os.makedirs(os.path.join(save_path, "annotations"), exist_ok=True)
@@ -82,15 +74,19 @@ def create_dataset(images_folder: str, coco_path: str, save_path: str):
         for bbox in bboxes:
             x, y, w, h = ensure_bbox_boundaries(extend_bbox(np.array(bbox), 0.1), image.shape[:2])
             cropped_img = image[y: y + h, x: x + w]
-            result = process_result(predictor(cropped_img))
+            result = predictor(cropped_img)
             mesh_annotations.append({
                 "bbox": bbox,
                 "extended_bbox": [int(x), int(y), int(w), int(h)],
                 **result
             })
+        if len(mesh_annotations) > 0:
+            stacked_annotations = {key: np.stack([d[key] for d in mesh_annotations]) for key in mesh_annotations[0].keys()}
+            np.savez(os.path.join(save_path, "annotations", image_info['file_name'].replace("jpg", "npz")), **stacked_annotations)
         cv2.imwrite(os.path.join(save_path, "images", image_info['file_name']), cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
-        with open(os.path.join(save_path, "annotations", image_info['file_name'].replace("jpg", "json")), "w") as f:
-            json.dump(mesh_annotations, f)
+    shutil.copy(coco_path, os.path.join(save_path, "coco_annotations.json"))
+    shutil.copy(coco_path.replace("coco.json", "train_annotations.json"), os.path.join(save_path, "train_annotations.json"))
+    shutil.copy(coco_path.replace("coco.json", "val_annotations.json"), os.path.join(save_path, "val_annotations.json"))
 
 
 if __name__ == '__main__':
