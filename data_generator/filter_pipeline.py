@@ -1,5 +1,6 @@
 import os
 import json
+from os import environ
 from typing import List, Tuple, Optional
 
 import cv2
@@ -95,15 +96,38 @@ class VerticalCutFilter:
         # If no non-intersecting split line is found, return None
         return None
 
+    def _has_left_bbox(self, split: int, bboxes: List[Box]) -> bool:
+        for box in bboxes:
+            if box.x2 < split:
+                return True
+        return False
+
+    def _has_right_bbox(self, split: int, bboxes: List[Box]) -> bool:
+        for box in bboxes:
+            if box.x1 > split:
+                return True
+        return False
+
+    def _valid_split(self, image: np.ndarray, bboxes: List[Box], vertical_split: Optional[int]) -> bool:
+        if vertical_split is None:
+            return False
+        image_l = image[:, :vertical_split]
+        image_r = image[:, vertical_split:]
+        if image_l.shape[1] < 10 or image_r.shape[1] < 10 or image_l.shape[0] < 10 or image_r.shape[0] < 10:
+            return False
+        if not self._has_right_bbox(vertical_split, bboxes) or not self._has_left_bbox(vertical_split, bboxes):
+            return False
+        return True
+
     def __call__(self, image: np.ndarray) -> bool:
         bboxes = self.detector(image)
         if len(bboxes) == 0:
             return True
         vertical_split = self.find_vertical_split(image.shape[1], bboxes)
+        if not self._valid_split(image, bboxes=bboxes, vertical_split=vertical_split):
+            return False
         image_l = image[:, :vertical_split]
         image_r = image[:, vertical_split:]
-        if image_l.shape[1] < 10 or image_r.shape[1] < 10 or image_l.shape[0] < 10 or image_r.shape[0] < 10:
-            return True
         bboxes_l = self.detector(image_l)
         bboxes_r = self.detector(image_r)
         if len(bboxes_l) + len(bboxes_r) != len(bboxes):
@@ -174,8 +198,9 @@ def filter_data(data_path: str, head_detector_path: str, save_path: str) -> None
     detector = HeadDetector(head_detector_path)
     single_image_filters = [DetectorFilter(detector), FaceDetectorFilter(detector), VerticalCutFilter(detector)]
     stability_metric = StabilityMetric(detector)
-    images = glob(f"{data_path}/*.jpg")
+    images = glob(f"{data_path}/images/*.jpg")
     metrics = []
+    filtered_files = []
     for image_path in tqdm(images):
         image = cv2.imread(image_path)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -187,12 +212,32 @@ def filter_data(data_path: str, head_detector_path: str, save_path: str) -> None
                 skip = True
                 break
         if skip:
+            filtered_files.append(os.path.split(image_path)[1])
             continue
         num_heads, metric = stability_metric(image)
         metrics.append({"filename": image_path, "num_heads": num_heads, "stability_metric": metric})
-    with open(os.path.join(save_path, "metrics.json"), "w") as file:
+    with open(os.path.join(data_path, "metrics.json"), "w") as file:
         json.dump(metrics, file)
+    write_image_paths_to_txt(filtered_files, os.path.join(data_path, "files.txt"))
+
+
+def write_image_paths_to_txt(image_paths: List[str], txt_file: str) -> None:
+    with open(txt_file, 'w') as file:
+        for image_path in image_paths:
+            file.write(image_path + '\n')
+
+
+def get_folder_name() -> str:
+    if "SLURM_ARRAY_TASK_ID" not in environ:
+        return "split_00000"
+    task_id = int(environ["SLURM_ARRAY_TASK_ID"])
+    return f"split_{task_id:05d}"
+
+
+def filter_dataset(data_path: str, head_detector_path: str, save_path: str):
+    folder = get_folder_name()
+    filter_data(os.path.join(data_path, folder), head_detector_path=head_detector_path, save_path=os.path.join(save_path, folder))
 
 
 if __name__ == "__main__":
-    Fire(filter_data)
+    Fire(filter_dataset)
