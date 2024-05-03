@@ -1,4 +1,6 @@
 import os
+import abc
+import glob
 import shutil
 from typing import Tuple, Union
 
@@ -9,6 +11,102 @@ from tqdm import tqdm
 from pycocotools.coco import COCO
 
 from dad_3d_heads.predictor import FaceMeshPredictor
+from binary_detector import HeadDetector
+
+
+class MeshDatasetCreator:
+    def __init__(self, image_folder: str, save_path: str):
+        self.predictor = FaceMeshPredictor.dad_3dnet()
+        self.save_path = save_path
+        self.image_folder = image_folder
+
+    @abc.abstractmethod
+    def _get_list_of_items(self):
+        pass
+
+    @abc.abstractmethod
+    def _get_image(self, item) -> Tuple[np.ndarray, str]:
+        pass
+
+    @abc.abstractmethod
+    def _get_bboxes(self, item, image):
+        pass
+
+    def process_dataset(self):
+        os.makedirs(os.path.join(self.save_path, "images"), exist_ok=True)
+        os.makedirs(os.path.join(self.save_path, "annotations"), exist_ok=True)
+        for item in tqdm(self._get_list_of_items()):
+            image, filename = self._get_image(item=item)
+            bboxes = self._get_bboxes(item=item, image=image)
+            mesh_annotations = []
+            for bbox in bboxes:
+                x, y, w, h = ensure_bbox_boundaries(extend_bbox(np.array(bbox), 0.1), image.shape[:2])
+                cropped_img = image[y: y + h, x: x + w]
+                result = self.predictor(cropped_img)
+                mesh_annotations.append({
+                    "bbox": bbox,
+                    "extended_bbox": [int(x), int(y), int(w), int(h)],
+                    "3dmm_params": result["3dmm_params"].cpu().numpy()
+                })
+            if len(mesh_annotations) > 0:
+                stacked_annotations = {key: np.stack([d[key] for d in mesh_annotations]) for key in
+                                       mesh_annotations[0].keys()}
+                np.savez(os.path.join(self.save_path, "annotations", filename.replace("jpg", "npz")),
+                         **stacked_annotations)
+            if not os.path.isfile(os.path.join(self.save_path, "images", filename)):
+                cv2.imwrite(os.path.join(self.save_path, "images", filename),
+                            cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
+
+
+class MeshDatasetFromCOCO(MeshDatasetCreator):
+    def __init__(self, image_folder: str, save_path: str, coco_path: str):
+        super().__init__(image_folder=image_folder, save_path=save_path)
+        self.coco = COCO(coco_path)
+        self.coco_path = coco_path
+
+    def _get_list_of_items(self):
+        img_ids = self.coco.getImgIds()
+        return img_ids
+
+    def _get_image(self, item) -> Tuple[np.ndarray, str]:
+        image_info = self.coco.loadImgs(item)[0]
+        image_path = os.path.join(self.image_folder, image_info['file_name'])
+        image = cv2.imread(image_path)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        return image, os.path.basename(image_path)
+
+    def _get_bboxes(self, item, image):
+        ann_ids = self.coco.getAnnIds(imgIds=item)
+        anns = self.coco.loadAnns(ann_ids)
+        bboxes = [x['bbox'] for x in anns]
+        return bboxes
+
+    def process_dataset(self):
+        super().process_dataset()
+        shutil.copy(self.coco_path, os.path.join(self.save_path, "coco_annotations.json"))
+        shutil.copy(self.coco_path.replace("coco.json", "train_annotations.json"),
+                    os.path.join(self.save_path, "train_annotations.json"))
+        shutil.copy(self.coco_path.replace("coco.json", "val_annotations.json"),
+                    os.path.join(self.save_path, "val_annotations.json"))
+
+
+class MeshDatasetFromImages(MeshDatasetCreator):
+    def __init__(self, image_folder: str, save_path: str, model_path: str):
+        super().__init__(image_folder=image_folder, save_path=save_path)
+        self.detector = HeadDetector(model_path)
+
+    def _get_list_of_items(self):
+        return glob.glob(f"{self.image_folder}/images/*.jpg")
+
+    def _get_image(self, item) -> Tuple[np.ndarray, str]:
+        image_path = item
+        image = cv2.imread(image_path)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        return image, os.path.basename(image_path)
+
+    def _get_bboxes(self, item, image):
+        bboxes = self.detector(image=image)
+        return np.array([x.to_xywh() for x in bboxes])
 
 
 def extend_bbox(bbox: np.array, offset: Union[Tuple[float, ...], float] = 0.1) -> np.array:
@@ -56,37 +154,9 @@ def ensure_bbox_boundaries(bbox: np.array, img_shape: Tuple[int, int]) -> np.arr
     return np.array([x1, y1, w, h]).astype("int32")
 
 
-def create_dataset(images_folder: str, coco_path: str, save_path: str):
-    os.makedirs(os.path.join(save_path, "images"), exist_ok=True)
-    os.makedirs(os.path.join(save_path, "annotations"), exist_ok=True)
-    coco = COCO(coco_path)
-    img_ids = coco.getImgIds()
-    predictor = FaceMeshPredictor.dad_3dnet()
-    for img_id in tqdm(img_ids):
-        image_info = coco.loadImgs(img_id)[0]
-        image_path = os.path.join(images_folder, image_info['file_name'])
-        image = cv2.imread(image_path)
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        ann_ids = coco.getAnnIds(imgIds=img_id)
-        anns = coco.loadAnns(ann_ids)
-        bboxes = [x['bbox'] for x in anns]
-        mesh_annotations = []
-        for bbox in bboxes:
-            x, y, w, h = ensure_bbox_boundaries(extend_bbox(np.array(bbox), 0.1), image.shape[:2])
-            cropped_img = image[y: y + h, x: x + w]
-            result = predictor(cropped_img)
-            mesh_annotations.append({
-                "bbox": bbox,
-                "extended_bbox": [int(x), int(y), int(w), int(h)],
-                **result
-            })
-        if len(mesh_annotations) > 0:
-            stacked_annotations = {key: np.stack([d[key] for d in mesh_annotations]) for key in mesh_annotations[0].keys()}
-            np.savez(os.path.join(save_path, "annotations", image_info['file_name'].replace("jpg", "npz")), **stacked_annotations)
-        cv2.imwrite(os.path.join(save_path, "images", image_info['file_name']), cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
-    shutil.copy(coco_path, os.path.join(save_path, "coco_annotations.json"))
-    shutil.copy(coco_path.replace("coco.json", "train_annotations.json"), os.path.join(save_path, "train_annotations.json"))
-    shutil.copy(coco_path.replace("coco.json", "val_annotations.json"), os.path.join(save_path, "val_annotations.json"))
+def create_dataset(image_folder: str, coco_path: str, save_path: str):
+    annotations_generator = MeshDatasetFromCOCO(image_folder=image_folder, save_path=save_path, coco_path=coco_path)
+    annotations_generator.process_dataset()
 
 
 if __name__ == '__main__':

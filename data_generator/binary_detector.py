@@ -29,10 +29,18 @@ class Box:
                         other.y2 - other.y1) - intersection_area)
         return iou
 
+    def to_xywh(self):
+        return np.array([self.x1, self.y1, self.x2 - self.x1, self.y2 - self.y1])
+
 
 class HeadDetector:
     def __init__(self, model_path: str, threshold: float = 0.5):
-        self.model = ort.InferenceSession(model_path)
+        providers = ["CUDAExecutionProvider"]
+        sess_opt = ort.SessionOptions()
+        sess_opt.intra_op_num_threads = 8
+        sess_opt.add_session_config_entry('session.intra_op_thread_affinities',
+                                          '3,4;5,6;7,8;9,10;11,12;13,14;15,16')  # set affinities of all 7 threads to cores in the first NUMA node
+        self.model = ort.InferenceSession(model_path, sess_opt, providers=providers)
         self.threshold = threshold
         self.size = np.array([[IMAGE_SIZE, IMAGE_SIZE]])
 
