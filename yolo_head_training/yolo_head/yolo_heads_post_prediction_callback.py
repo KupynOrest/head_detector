@@ -91,8 +91,8 @@ class YoloHeadsPostPredictionCallback(AbstractPoseEstimationPostPredictionCallba
                 scores=final_scores,
                 bboxes_xyxy=final_bboxes,
                 mm_params=final_params,
-                predicted_3d_vertices=final_3d_pts,
-                predicted_2d_vertices=final_2d_pts,
+                predicted_3d_vertices=final_3d_pts.clone(),
+                predicted_2d_vertices=final_2d_pts.clone(),
             )
 
             decoded_predictions.append(p)
