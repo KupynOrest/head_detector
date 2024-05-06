@@ -89,37 +89,44 @@ neck:
 
 heads:
   YoloHeadsNDFLHeads:
-    num_classes: 413
     reg_max: 16
     heads_list:
       - YoloHeadsDFLHead:
-          bbox_inter_channels: 128
-          flame_inter_channels: 128
+          bbox_inter_channels: 256
+          flame_inter_channels: 256
           flame_regression_blocks: 2
+          flame_shape_inter_channels: 128
+          flame_expression_inter_channels: 64
+          flame_transformation_inter_channels: 16
           shared_stem: False
           width_mult: 0.75
           first_conv_group_size: 0
-          num_classes:
           stride: 8
           reg_max: 16
+
       - YoloHeadsDFLHead:
           bbox_inter_channels: 256
-          flame_inter_channels: 512
+          flame_inter_channels: 256
           flame_regression_blocks: 2
+          flame_shape_inter_channels: 128
+          flame_expression_inter_channels: 64
+          flame_transformation_inter_channels: 16
           shared_stem: False
           width_mult: 0.75
           first_conv_group_size: 0
-          num_classes:
           stride: 16
           reg_max: 16
+
       - YoloHeadsDFLHead:
-          bbox_inter_channels: 512
-          flame_inter_channels: 512
-          flame_regression_blocks: 3
+          bbox_inter_channels: 256
+          flame_inter_channels: 256
+          flame_regression_blocks: 2
+          flame_shape_inter_channels: 128
+          flame_expression_inter_channels: 64
+          flame_transformation_inter_channels: 16
           shared_stem: False
           width_mult: 0.75
           first_conv_group_size: 0
-          num_classes:
           stride: 32
           reg_max: 16
 

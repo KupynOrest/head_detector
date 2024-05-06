@@ -61,7 +61,6 @@ class YoloHeadsNDFLHeads(BaseDetectionModule, SupportsReplaceNumClasses):
         """
         Initializes the NDFLHeads module.
 
-        :param num_classes: Number of detection classes
         :param in_channels: Number of channels for each feature map (See width_mult)
         :param grid_cell_scale: A scaling factor applied to the grid cell coordinates.
                This scaling factor is used to define anchor boxes (see generate_anchors_for_grid_cell).
@@ -76,7 +75,6 @@ class YoloHeadsNDFLHeads(BaseDetectionModule, SupportsReplaceNumClasses):
         super().__init__(in_channels)
 
         self.in_channels = tuple(in_channels)
-        self.num_classes = num_classes
         self.grid_cell_scale = grid_cell_scale
         self.grid_cell_offset = grid_cell_offset
         self.reg_max = reg_max
@@ -86,7 +84,7 @@ class YoloHeadsNDFLHeads(BaseDetectionModule, SupportsReplaceNumClasses):
         self.register_buffer("proj_conv", proj, persistent=False)
 
         factory = det_factory.DetectionModulesFactory()
-        heads_list = self._insert_heads_list_params(heads_list, factory, num_classes, reg_max)
+        # heads_list = self._insert_heads_list_params(heads_list, factory, num_classes, reg_max)
 
         self.num_heads = len(heads_list)
         fpn_strides: List[int] = []
@@ -97,16 +95,9 @@ class YoloHeadsNDFLHeads(BaseDetectionModule, SupportsReplaceNumClasses):
 
         self.fpn_strides = tuple(fpn_strides)
 
-    def replace_num_classes(self, num_classes: int, compute_new_weights_fn: Callable[[nn.Module, int], nn.Module]):
-        for i in range(self.num_heads):
-            head = getattr(self, f"head{i + 1}")
-            head.replace_num_classes(num_classes, compute_new_weights_fn)
-
-        self.num_classes = num_classes
-
     @staticmethod
     def _insert_heads_list_params(
-        heads_list: List[Union[HpmStruct, DictConfig]], factory: det_factory.DetectionModulesFactory, num_classes: int, reg_max: int
+        heads_list: List[Union[HpmStruct, DictConfig]], factory: det_factory.DetectionModulesFactory, reg_max: int
     ) -> List[Union[HpmStruct, DictConfig]]:
         """
         Injects num_classes and reg_max parameters into the heads_list.
@@ -118,7 +109,7 @@ class YoloHeadsNDFLHeads(BaseDetectionModule, SupportsReplaceNumClasses):
         :return:            Heads list with injected parameters
         """
         for i in range(len(heads_list)):
-            heads_list[i] = factory.insert_module_param(heads_list[i], "num_classes", num_classes)
+            # heads_list[i] = factory.insert_module_param(heads_list[i], "num_classes", num_classes)
             heads_list[i] = factory.insert_module_param(heads_list[i], "reg_max", reg_max)
         return heads_list
 

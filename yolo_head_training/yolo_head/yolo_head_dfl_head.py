@@ -11,6 +11,8 @@ from super_gradients.modules import ConvBNReLU, QARepVGGBlock
 from super_gradients.modules.base_modules import BaseDetectionModule
 from super_gradients.modules.utils import width_multiplier
 
+from yolo_head.flame import FLAME_CONSTS
+
 
 @register_detection_module()
 class YoloHeadsDFLHead(BaseDetectionModule):
@@ -24,11 +26,14 @@ class YoloHeadsDFLHead(BaseDetectionModule):
         in_channels: int,
         bbox_inter_channels: int,
         flame_inter_channels: int,
+        flame_shape_inter_channels: int,
+        flame_expression_inter_channels: int,
+        flame_transformation_inter_channels: int,
         flame_regression_blocks: int,
         shared_stem: bool,
         width_mult: float,
         first_conv_group_size: int,
-        num_classes: int,
+        # num_classes: int,
         stride: int,
         reg_max: int,
         cls_dropout_rate: float = 0.0,
@@ -61,7 +66,7 @@ class YoloHeadsDFLHead(BaseDetectionModule):
         else:
             groups = bbox_inter_channels // first_conv_group_size
 
-        self.num_classes = num_classes
+        #self.num_classes = num_classes
         self.shared_stem = shared_stem
 
         if self.shared_stem:
@@ -89,15 +94,28 @@ class YoloHeadsDFLHead(BaseDetectionModule):
         first_reg_conv = [ConvBNReLU(bbox_inter_channels, bbox_inter_channels, kernel_size=3, stride=1, padding=1, groups=groups, bias=False)] if groups else []
         self.reg_convs = nn.Sequential(*first_reg_conv, ConvBNReLU(bbox_inter_channels, bbox_inter_channels, kernel_size=3, stride=1, padding=1, bias=False))
 
-        pose_block = partial(QARepVGGBlock, use_alpha=True)
-
-        flame_convs = [pose_block(flame_inter_channels, flame_inter_channels) for _ in range(flame_regression_blocks)]
-        self.flame_convs = nn.Sequential(*flame_convs)
-
         self.reg_pred = nn.Conv2d(bbox_inter_channels, 4 * (reg_max + 1), 1, 1, 0)
 
         self.cls_pred = nn.Conv2d(bbox_inter_channels, 1, 1, 1, 0)
-        self.flame_pred = nn.Conv2d(flame_inter_channels, self.num_classes, 1, 1, 0)  # each keypoint is x,y,confidence
+
+        self.flame_shape_pred = self.build_flame_regression_layers(
+            flame_inter_channels, flame_shape_inter_channels, flame_regression_blocks, FLAME_CONSTS["shape"]
+        )
+        self.flame_expression_pred = self.build_flame_regression_layers(
+            flame_inter_channels, flame_expression_inter_channels, flame_regression_blocks, FLAME_CONSTS["expression"]
+        )
+        self.flame_rotation_pred = self.build_flame_regression_layers(
+            flame_inter_channels, flame_transformation_inter_channels, flame_regression_blocks, FLAME_CONSTS["rotation"]
+        )
+        self.flame_jaw_pred = self.build_flame_regression_layers(
+            flame_inter_channels, flame_transformation_inter_channels, flame_regression_blocks, FLAME_CONSTS["jaw"]
+        )
+        self.flame_scale_pred = self.build_flame_regression_layers(
+            flame_inter_channels, flame_transformation_inter_channels, flame_regression_blocks, FLAME_CONSTS["scale"]
+        )
+        self.flame_translation_pred = self.build_flame_regression_layers(
+            flame_inter_channels, flame_transformation_inter_channels, flame_regression_blocks, FLAME_CONSTS["translation"]
+        )
 
         self.cls_dropout_rate = nn.Dropout2d(cls_dropout_rate) if cls_dropout_rate > 0 else nn.Identity()
         self.reg_dropout_rate = nn.Dropout2d(reg_dropout_rate) if reg_dropout_rate > 0 else nn.Identity()
@@ -107,6 +125,14 @@ class YoloHeadsDFLHead(BaseDetectionModule):
         self.prior_prob = 1e-2
         self._initialize_biases()
 
+    def build_flame_regression_layers(self, in_channels, inter_channels, num_blocks, out_channels):
+        pose_block = partial(QARepVGGBlock, use_residual_connection=False, use_alpha=True)
+        layers = []
+        for _ in range(num_blocks):
+            layers.append(pose_block(in_channels, inter_channels))
+            in_channels = inter_channels
+        layers.append(nn.Conv2d(inter_channels, out_channels, 1, 1, 0))
+        return nn.Sequential(*layers)
 
     @property
     def out_channels(self):
@@ -133,10 +159,14 @@ class YoloHeadsDFLHead(BaseDetectionModule):
         reg_feat = self.reg_dropout_rate(reg_feat)
         reg_output = self.reg_pred(reg_feat)
 
-        pose_feat = self.flame_convs(pose_features)
-        pose_feat = self.reg_dropout_rate(pose_feat)
+        flame_shape = self.flame_shape_pred(pose_features)
+        flame_expression = self.flame_expression_pred(pose_features)
+        flame_rotation = self.flame_rotation_pred(pose_features)
+        flame_jaw = self.flame_jaw_pred(pose_features)
+        flame_translation = self.flame_translation_pred(pose_features)
+        flame_scale = self.flame_scale_pred(pose_features)
 
-        flame_output = self.flame_pred(pose_feat)
+        flame_output = torch.cat([flame_shape, flame_expression, flame_rotation, flame_jaw, flame_translation, flame_scale], dim=1)
 
         return reg_output, cls_output, flame_output
 

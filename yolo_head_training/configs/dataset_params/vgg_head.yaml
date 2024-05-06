@@ -28,7 +28,7 @@ train_dataset_params:
     - KeypointsRandomAffineTransform:
         max_rotation: 15
         min_scale: 0.5
-        max_scale: 1.0
+        max_scale: 2.0
         max_translate: 0.1
         image_pad_value: 127
         mask_pad_value: 1
