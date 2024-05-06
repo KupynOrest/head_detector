@@ -9,8 +9,8 @@ lr_warmup_epochs: 1
 
 initial_lr: 1e-4
 lr_mode: cosine
-cosine_final_lr_ratio: 0.05
-max_epochs: 100
+cosine_final_lr_ratio: 0.1
+max_epochs: 200
 
 zero_weight_decay_on_bias_and_bn: True
 batch_accumulate: 1
@@ -26,7 +26,7 @@ criterion_params:
   classification_loss_weight: 1.0
   classification_loss_type: focal
   regression_iou_loss_type: ciou
-  iou_loss_weight: 1.0
+  iou_loss_weight: 2.0
   dfl_loss_weight: 0.01
   pose_reg_loss_weight: 1.0
   pose_classification_loss_type: focal
@@ -78,7 +78,7 @@ phase_callbacks:
   - ExtremeBatchYoloHeadsVisualizationCallback:
       loss_to_monitor: YoloHeadsLoss/loss
       max: True
-      freq: 1
+      freq: 10
       max_images: 16
       enable_on_train_loader: True
       enable_on_valid_loader: True
