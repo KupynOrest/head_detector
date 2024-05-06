@@ -163,7 +163,6 @@ class YoloHeadsNDFLHeads(BaseDetectionModule, SupportsReplaceNumClasses):
 
         flame_params_list = torch.cat(flame_params_list, dim=-1)  # [B, Num Flame Params, Anchors]
         flame_params = FlameParams.from_3dmm(flame_params_list, FLAME_CONSTS)
-        flame_params.scale = torch.exp(flame_params.scale) + stride_tensor.view(1, 1, -1)
         flame_params.translation[:, 0:2] += einops.rearrange(centers, "A N -> 1 N A")
         flame_params = flame_params.to_3dmm_tensor()  # [B, Num Flame Params, Anchors]
         flame_params = einops.rearrange(flame_params, "B F A -> B A F")  # Rearrange to common format where anchors comes first
