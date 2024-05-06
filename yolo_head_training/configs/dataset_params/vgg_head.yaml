@@ -38,8 +38,8 @@ train_dataset_params:
     - KeypointsRandomRotate90:
         prob: 0.5
 
-    - KeypointsMosaic:
-        prob: 0.5
+#    - KeypointsMosaic:
+#        prob: 0.5
 
     - KeypointsLongestMaxSize:
         max_height: ${dataset_params.image_size}
