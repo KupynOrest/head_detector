@@ -159,8 +159,8 @@ class YoloHeadsDFLHead(BaseDetectionModule):
         reg_feat = self.reg_dropout_rate(reg_feat)
         reg_output = self.reg_pred(reg_feat)
 
-        flame_shape = self.flame_shape_pred(pose_features).tanh()
-        flame_expression = self.flame_expression_pred(pose_features).tanh()
+        flame_shape = self.flame_shape_pred(pose_features).tanh() * 3
+        flame_expression = self.flame_expression_pred(pose_features).tanh() * 3
         flame_rotation = self.flame_rotation_pred(pose_features)
         flame_jaw = self.flame_jaw_pred(pose_features)
         flame_translation = self.flame_translation_pred(pose_features)
