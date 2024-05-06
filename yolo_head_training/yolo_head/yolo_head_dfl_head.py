@@ -162,7 +162,7 @@ class YoloHeadsDFLHead(BaseDetectionModule):
         flame_shape = self.flame_shape_pred(pose_features).tanh()
         flame_expression = self.flame_expression_pred(pose_features).tanh()
         flame_rotation = self.flame_rotation_pred(pose_features)
-        flame_jaw = self.flame_jaw_pred(pose_features).tanh()
+        flame_jaw = self.flame_jaw_pred(pose_features)
         flame_translation = self.flame_translation_pred(pose_features)
         flame_scale = self.flame_scale_pred(pose_features).exp() * self.stride
 
