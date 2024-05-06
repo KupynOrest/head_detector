@@ -17,13 +17,13 @@ train_dataset_params:
     - KeypointsBrightnessContrast:
         brightness_range: [ 0.8, 1.2 ]
         contrast_range: [ 0.8, 1.2 ]
-        prob: 0.5
+        prob: 1.0
 
     - KeypointsHSV:
         hgain: 20
         sgain: 20
         vgain: 20
-        prob: 0.5
+        prob: 1.0
 
     - KeypointsRandomAffineTransform:
         max_rotation: 15
@@ -36,7 +36,7 @@ train_dataset_params:
         interpolation_mode: [0, 1, 2, 3, 4]
 
     - KeypointsRandomRotate90:
-        prob: 0.5
+        prob: 1.0
 
     - KeypointsMosaic:
         prob: 1.0
