@@ -164,7 +164,7 @@ class YoloHeadsDFLHead(BaseDetectionModule):
         flame_rotation = self.flame_rotation_pred(pose_features)
         flame_jaw = self.flame_jaw_pred(pose_features)
         flame_translation = self.flame_translation_pred(pose_features)
-        flame_scale = self.flame_scale_pred(pose_features)
+        flame_scale = self.flame_scale_pred(pose_features).exp()
 
         flame_output = torch.cat([flame_shape, flame_expression, flame_rotation, flame_jaw, flame_translation, flame_scale], dim=1)
 
