@@ -53,10 +53,11 @@ class YoloHeadsPostPredictionCallback(AbstractPoseEstimationPostPredictionCallba
 
         decoded_predictions: List[YoloHeadsPredictions] = []
 
+        flame_layer = self.flame.to(predictions.boxes_xyxy.device)
         for pred_bboxes_xyxy, pred_bboxes_conf, pred_flame_params in zip(
-            predictions.boxes_xyxy.detach().cpu().float(),
-            predictions.scores.detach().cpu().float(),
-            predictions.flame_params.detach().cpu().float(),
+            predictions.boxes_xyxy.detach().float(),
+            predictions.scores.detach().float(),
+            predictions.flame_params.detach().float(),
         ):
             # pred_bboxes [Anchors, 4] in XYXY format
             # pred_scores [Anchors, 1] confidence scores [0..1]
@@ -84,15 +85,15 @@ class YoloHeadsPostPredictionCallback(AbstractPoseEstimationPostPredictionCallba
             final_scores = pred_bboxes_conf[idx_to_keep][: self.post_nms_max_predictions]  # [Instances, 1]
             final_params = pred_flame_params[idx_to_keep][: self.post_nms_max_predictions]  # [Instances, Flame Params]
 
-            final_3d_pts = reproject_spatial_vertices(self.flame, final_params, to_2d=True, subset_indexes=self.indexes_subset)
+            final_3d_pts = reproject_spatial_vertices(flame_layer, final_params, to_2d=True, subset_indexes=self.indexes_subset)
             final_2d_pts = final_3d_pts[..., :2]
 
             p = YoloHeadsPredictions(
-                scores=final_scores,
-                bboxes_xyxy=final_bboxes,
-                mm_params=final_params,
-                predicted_3d_vertices=final_3d_pts.clone(),
-                predicted_2d_vertices=final_2d_pts.clone(),
+                scores=final_scores.cpu(),
+                bboxes_xyxy=final_bboxes.cpu(),
+                mm_params=final_params.cpu(),
+                predicted_3d_vertices=final_3d_pts.cpu().clone(),
+                predicted_2d_vertices=final_2d_pts.cpu().clone(),
             )
 
             decoded_predictions.append(p)
