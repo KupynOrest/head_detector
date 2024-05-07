@@ -44,7 +44,7 @@ class DAD3DHeadsDataset(AbstractPoseEstimationDataset):
 
         for ann_file in ann_files:
             if not os.path.exists(ann_file):
-                raise ValueError("")
+                raise ValueError(f"Annotation file not found: {ann_file}")
 
         super().__init__(
             transforms=transforms,
