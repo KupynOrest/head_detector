@@ -52,14 +52,16 @@ def get_flame_model(flame_path: Optional[str] = None) -> Struct:
     return flame_model
 
 
+def load_indices(path: str):
+    return np.load(str(path), allow_pickle=True)[()]
+
+
 def get_445_keypoints_subset(name):
-    flame_path = Path(__file__).parent / "face_keypoints" / "keypoints_445" / name
-    return np.load(str(flame_path), allow_pickle=True)[()]
+    return load_indices(Path(__file__).parent / "face_keypoints" / "keypoints_445" / name)
 
 
 def get_445_keypoints_indexes():
     brows = get_445_keypoints_subset("brows.npy")
-    cheeks = get_445_keypoints_subset("cheeks.npy")
     contour = get_445_keypoints_subset("contour.npy")
     eyes = get_445_keypoints_subset("eyes.npy")
     forehead = get_445_keypoints_subset("forehead.npy")
@@ -68,7 +70,7 @@ def get_445_keypoints_indexes():
     temples = get_445_keypoints_subset("temples.npy")
 
     all_indexes = []
-    for subset in [brows, cheeks, contour, eyes, forehead, lips, nose, temples]:
+    for subset in [brows, contour, eyes, forehead, lips, nose, temples]:
         for value in subset.values():
             all_indexes += list(value)
 
@@ -79,6 +81,19 @@ def get_445_keypoints_indexes():
 def get_191_keypoints(name):
     flame_path = Path(__file__).parent / "face_keypoints" / "keypoints_191" / name
     return np.load(str(flame_path))
+
+
+def get_indices():
+    keypoint_445 = get_445_keypoints_indexes()
+    head_indices = load_indices(str(Path(__file__).parent / "flame_indices" / "head.npy"))
+    face_indices = load_indices(str(Path(__file__).parent / "flame_indices" / "face.npy"))
+    face_w_ears = load_indices(str(Path(__file__).parent / "flame_indices" / "face_w_ears.npy"))
+    return {
+        "head": head_indices,
+        "face": face_indices,
+        "face_w_ears": face_w_ears,
+        "keypoint_445": keypoint_445,
+    }
 
 
 @dataclass

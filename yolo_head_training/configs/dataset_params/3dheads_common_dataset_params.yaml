@@ -2,6 +2,6 @@
 # skeleton configuration specific to COCO dataset. It is used by other dataset_params files to
 # avoid code duplication.
 
-num_joints: 565
+num_joints: 445
 oks_sigma:  0.025
 

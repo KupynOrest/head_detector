@@ -66,7 +66,6 @@ class YoloHeadsDFLHead(BaseDetectionModule):
         else:
             groups = bbox_inter_channels // first_conv_group_size
 
-        #self.num_classes = num_classes
         self.shared_stem = shared_stem
 
         if self.shared_stem:

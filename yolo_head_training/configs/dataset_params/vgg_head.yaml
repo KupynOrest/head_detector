@@ -9,6 +9,7 @@ dataset_params_suffix: "${dataset_params.image_size}"
 train_dataset_params:
   data_dir: g:/VGGHead/train
   num_joints: ${dataset_params.num_joints}
+  mode: train
   transforms:
 #    - KeypointsRandomHorizontalFlip:
 #        flip_index: ${dataset_params.flip_indexes}
@@ -63,6 +64,7 @@ train_dataset_params:
 val_dataset_params:
   data_dir: g:/VGGHead/val
   num_joints: ${dataset_params.num_joints}
+  mode: val
   transforms:
     - KeypointsLongestMaxSize:
         max_height: ${dataset_params.image_size}
@@ -82,7 +84,7 @@ val_dataset_params:
 train_dataloader_params:
   dataset: DAD3DHeadsDataset
   shuffle: True
-  batch_size: 24
+  batch_size: 48
   num_workers: 8
   drop_last: True
   pin_memory: False
@@ -90,7 +92,7 @@ train_dataloader_params:
 
 val_dataloader_params:
   dataset: DAD3DHeadsDataset
-  batch_size: 32
+  batch_size: 48
   num_workers: 8
   drop_last: False
   pin_memory: False

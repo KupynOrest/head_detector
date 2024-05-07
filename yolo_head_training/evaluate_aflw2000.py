@@ -1,17 +1,29 @@
+import math
 from pathlib import Path
+from typing import Union, Optional
 
-import matplotlib.pyplot as plt
+from dataclasses import dataclass
 import numpy as np
 import torch
 from fire import Fire
-from infery.utils.importing.lazy_imports import cv2
+import cv2
 from super_gradients.training import models
 import scipy.io
+from scipy.spatial.transform import Rotation
 from super_gradients.training.utils.utils import infer_model_device
 
 from yolo_head.dataset_parsing import draw_2d_keypoints
-from yolo_head.flame import FlameParams, FLAME_CONSTS
+from yolo_head.flame import FlameParams, FLAME_CONSTS, rot_mat_from_6dof
 from yolo_head.yolo_heads_predictions import YoloHeadsPredictions
+
+
+MAX_ROTATION = 99
+
+@dataclass
+class RPY:
+    roll: float
+    pitch: float
+    yaw: float
 
 
 def find_images_and_labels(dataset_dir):
@@ -32,7 +44,7 @@ def find_images_and_labels(dataset_dir):
     return images, labels
 
 
-def predict_on_image(model, image, dsize=320):
+def predict_on_image(model, image, dsize=640):
     device = infer_model_device(model)
 
     # Resize image to dsize x dsize but keep the aspect ratio by padding with zeros
@@ -65,28 +77,111 @@ def predict_on_image(model, image, dsize=320):
     flame = FlameParams.from_3dmm(predictions.mm_params, FLAME_CONSTS)
     flame.scale /= scale
 
+    print(flame.rotation)
+    print("===========================================")
+
     predictions.mm_params = flame.to_3dmm_tensor()
 
-    return predictions
+    return predictions, flame
+
+
+def limit_angle(angle: Union[int, float], pi: Union[int, float] = 180.0) -> Union[int, float]:
+    """
+    Angle should be in degrees, not in radians.
+    If you have an angle in radians - use the function radians_to_degrees.
+    """
+    if angle < -pi:
+        k = -2 * (int(angle / pi) // 2)
+        angle = angle + k * pi
+    if angle > pi:
+        k = 2 * ((int(angle / pi) + 1) // 2)
+        angle = angle - k * pi
+
+    return angle
+
+
+def calculate_rpy(flame_params) -> RPY:
+    rot_mat = rot_mat_from_6dof(flame_params.rotation).numpy()[0]
+    rot_mat_2 = np.transpose(rot_mat)
+    angle = Rotation.from_matrix(rot_mat_2).as_euler("xyz", degrees=True)
+    roll, pitch, yaw = list(map(limit_angle, [angle[2], angle[0] - 180, angle[1]]))
+    return RPY(roll=roll, pitch=pitch, yaw=yaw)
+
+
+def get_ground_truth(pose_path: str) -> Optional[RPY]:
+    mat = scipy.io.loadmat(pose_path)
+    pose_params = mat["Pose_Para"][0]
+    degrees = pose_params[:3] * (180 / np.pi)
+    if np.any(np.abs(degrees) > MAX_ROTATION):
+        return None
+    return RPY(roll=degrees[2], pitch=degrees[0], yaw=degrees[1])
+
+
+def mae(x, y):
+    PI = 180.0
+    return min(
+        math.fabs(x - y),
+        math.fabs(x - (y - 2 * PI)),
+        math.fabs(x - (y + 2 * PI)),
+    )
+
+
+def draw_pose(rpy: RPY, image: np.ndarray) -> np.ndarray:
+    roll, pitch, yaw = rpy.roll, rpy.pitch, rpy.yaw
+    tdx, tdy = image.shape[1] // 2, image.shape[0] // 2
+
+    size = image.shape[0] // 10
+
+    x1 = size * (np.cos(yaw) * np.cos(roll)) + tdx
+    y1 = size * (np.cos(pitch) * np.sin(roll) + np.cos(roll) * np.sin(pitch) * np.sin(yaw)) + tdy
+
+    x2 = size * (-np.cos(yaw) * np.sin(roll)) + tdx
+    y2 = size * (np.cos(pitch) * np.cos(roll) - np.sin(pitch) * np.sin(yaw) * np.sin(roll)) + tdy
+
+    x3 = size * (np.sin(yaw)) + tdx
+    y3 = size * (-np.cos(yaw) * np.sin(pitch)) + tdy
+
+    cv2.arrowedLine(image, (int(tdx), int(tdy)), (int(x1), int(y1)), (0, 0, 255), int(image.shape[0] * 0.005))
+    cv2.arrowedLine(image, (int(tdx), int(tdy)), (int(x2), int(y2)), (0, 255, 0), int(image.shape[0] * 0.005))
+    cv2.arrowedLine(image, (int(tdx), int(tdy)), (int(x3), int(y3)), (255, 0, 0), int(image.shape[0] * 0.005))
+
+    return image
 
 
 def main(model_name="YoloHeads_M", checkpoint="C:/Develop/GitHub/VGG/head_detector/yolo_head_training/weights/ckpt_best.pth", dataset_dir="g:/AFLW2000"):
     images, labels = find_images_and_labels(dataset_dir)
     model = models.get(model_name, checkpoint_path=checkpoint, num_classes=413).eval() # 412 is total number of flame params
-
-    for image_path, gt in zip(images[:10], labels[:10]):
+    metrics = {
+        "roll": [],
+        "pitch": [],
+        "yaw": [],
+    }
+    index = 0
+    for image_path, gt in zip(images[:20], labels[:20]):
         image = cv2.imread(str(image_path))
+        gt_image = image.copy()
         # image = cv2.resize(image, (640, 640))
-        predictions = predict_on_image(model, image)
+        predictions, flame_params = predict_on_image(model, image)
+        pred_pose = calculate_rpy(flame_params)
+        gt_pose = get_ground_truth(str(gt))
+        print(pred_pose, gt_pose)
+        if gt_pose is None:
+            continue
 
-        plt.figure()
-        plt.imshow(draw_2d_keypoints(image[..., ::-1], predictions.predicted_2d_vertices.reshape(-1, 2))) # 565
-        plt.show()
+        metrics["roll"].append(mae(gt_pose.roll, pred_pose.roll))
+        metrics["pitch"].append(mae(gt_pose.pitch, pred_pose.pitch))
+        metrics["yaw"].append(mae(gt_pose.yaw, pred_pose.yaw))
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        image = draw_2d_keypoints(image[..., ::-1], predictions.predicted_2d_vertices.reshape(-1, 2))
+        image = draw_pose(pred_pose, image)
+        gt_image = draw_pose(gt_pose, gt_image)
+        cv2.imwrite(f"output/{index}.jpg", np.hstack((image, gt_image)))
+        index += 1
 
-        # Load the ground truth
-        gt = scipy.io.loadmat(gt)
-        gt_pose = np.array(gt["Pose_Para"])  # (1, 7) shape ??? 3 rotation, 3 translation, 1 scale ?
-        gt_pts3d = np.array(gt["pts3d_68"])  # (3, 68) shape
+    roll_mae = np.mean(np.array(metrics["roll"]))
+    pitch_mae = np.mean(np.array(metrics["pitch"]))
+    yaw_mae = np.mean(np.array(metrics["yaw"]))
+    print(f"Roll MAE: {roll_mae}, Pitch MAE: {pitch_mae}, Yaw MAE: {yaw_mae}, MAE = {(roll_mae + pitch_mae + yaw_mae) / 3}")
 
 
 if __name__ == "__main__":

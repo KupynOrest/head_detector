@@ -1,12 +1,14 @@
-import json
 from dataclasses import dataclass
-from typing import Tuple, List
+from typing import Tuple, List, Optional, Dict
 
 import cv2
 import numpy as np
+import torch
+from yolo_head.flame import FlameParams, FLAMELayer
 
 # Pair of indexes corresponding to the 68 face keypoints
 # Indexes are 1-based
+DAD_SIZE = 256
 FACE_KEYPOINTS_SKELETON = (
     (1, 2),
     (2, 3),
@@ -121,15 +123,14 @@ class HeadAnnotation:
     """
     :param bbox: (x,y,w,h)
     :param extended_bbox: (x,y,w,h)
-    :param points: (68, 2) - Face keypoints relative to bbox
     """
 
     bbox: Tuple[int, int, int, int]
     extended_bbox: Tuple[int, int, int, int]
-    points: np.ndarray
     projected_vertices: np.ndarray
     vertices_3d: np.ndarray
     mm_params: np.ndarray
+    points: Optional[np.ndarray] = None
 
     def get_face_bbox_xywh(self):
         return np.array(self.bbox)
@@ -162,20 +163,33 @@ class SampleAnnotation:
     heads: List[HeadAnnotation]
 
 
-def read_annotation(ann_file: str) -> SampleAnnotation:
-    with open(ann_file, "r") as f:
-        ann = json.load(f)
+def get_vertices(annotation: Dict[str, np.ndarray], index: int, flame) -> Tuple[np.ndarray, np.ndarray]:
+    if "3d_vertices" in annotation.keys():
+        return np.array(annotation["3d_vertices"][index], dtype=np.float32), \
+               np.array(annotation["projected_vertices"][index][0], dtype=np.float32)
+    flame_params = FlameParams.from_3dmm(torch.from_numpy(annotation["3dmm_params"][index]), flame.flame_constants)
+    vertices = flame.forward(flame_params, zero_rot=False)
+    scale = torch.clamp(flame_params.scale[:, None] + 1.0, 1e-8)
+    vertices *= scale  # [B, 1, 1]
+    flame_params.translation[..., 2] = 0.0
+    vertices += flame_params.translation[:, None]  # [B, 1, 3]
+    projected_vertices = (vertices + 1.0) / 2.0 * DAD_SIZE
+    projected_vertices = projected_vertices[..., :2]
+    return vertices.numpy()[0], projected_vertices.numpy()[0]
 
+
+def read_annotation(ann_file: str, flame) -> SampleAnnotation:
+    ann = np.load(ann_file)
     head_anns = []
-    for head in ann:
+    for index in range(len(ann["3dmm_params"])):
+        vertices_3d, projected_vertices = get_vertices(ann, index, flame)
         head_anns.append(
             HeadAnnotation(
-                bbox=tuple(head["bbox"]),
-                extended_bbox=tuple(head["extended_bbox"]),
-                points=np.array(head["points"], dtype=np.float32),
-                projected_vertices=np.array(head["projected_vertices"], dtype=np.float32),
-                vertices_3d=np.array(head["3d_vertices"], dtype=np.float32),
-                mm_params=np.array(head["3dmm_params"], dtype=np.float32),
+                bbox=tuple(ann["bbox"][index]),
+                extended_bbox=tuple(ann["extended_bbox"][index]),
+                projected_vertices=projected_vertices,
+                vertices_3d=vertices_3d,
+                mm_params=np.array(ann["3dmm_params"][index][0], dtype=np.float32),
             )
         )
     sample = SampleAnnotation(heads=head_anns)

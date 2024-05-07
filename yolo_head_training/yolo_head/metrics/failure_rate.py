@@ -26,7 +26,7 @@ def percentage_of_errors_below_IOD(
     err = (output_kp - target_kp).norm(2, -1).mean(-1)
     # norm_distance = 2.0 for the 3D case, where the keypoints are in the normalized cube [-1; 1] ^ 3.
     norm_distance = torch.sqrt(bbox[2] * bbox[3]) if bbox is not None else 2.0
-    number_of_images = (err < threshold * norm_distance).sum() if below else (err > threshold * norm_distance).sum()
+    number_of_images = (err > threshold * norm_distance).sum() if below else (err < threshold * norm_distance).sum()
     return number_of_images  # percentage of such examples in a batch
 
 
@@ -107,5 +107,5 @@ class KeypointsFailureRate(Metric):
         total = int(self.total)
         total_tp = int(self.total_tp)
         acc = total_tp / total if total else 0
-        failure_rate = self.failure_rate
-        return (failure_rate / acc) if total_tp > 0 else torch.tensor(1, dtype=torch.float32, device=self.device)
+        failure_rate = self.failure_rate / self.total_tp
+        return (1 - (1 - failure_rate) * acc) if total_tp > 0 else torch.tensor(1, dtype=torch.float32, device=self.device)

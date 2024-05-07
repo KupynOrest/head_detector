@@ -16,7 +16,7 @@ from super_gradients.training.samples import PoseEstimationSample
 from super_gradients.training.transforms.keypoint_transforms import AbstractKeypointTransform
 
 from yolo_head.dataset_parsing import read_annotation, SampleAnnotation
-from yolo_head.flame import get_445_keypoints_indexes
+from yolo_head.flame import get_indices, FLAMELayer, FLAME_CONSTS
 
 logger = get_logger(__name__)
 
@@ -28,6 +28,7 @@ class DAD3DHeadsDataset(AbstractPoseEstimationDataset):
         self,
         data_dir: str,
         num_joints: int,
+        mode: str,
         transforms: List[AbstractKeypointTransform],
     ):
         """
@@ -36,8 +37,10 @@ class DAD3DHeadsDataset(AbstractPoseEstimationDataset):
         :param transforms:                   Transforms to be applied to the image & keypoints
 
         """
+        self.data_dir = data_dir
         images = fs.find_images_in_dir(os.path.join(data_dir, "images"))
-        ann_files = [os.path.join(data_dir, "annotations", fs.id_from_fname(x) + ".json") for x in images]
+        images = self.filter_images(images, mode)
+        ann_files = [x.replace("images", "annotations").replace(".jpg", ".npz") for x in images]
 
         for ann_file in ann_files:
             if not os.path.exists(ann_file):
@@ -52,10 +55,20 @@ class DAD3DHeadsDataset(AbstractPoseEstimationDataset):
         )
         self.images = np.array(images)
         self.ann_files = np.array(ann_files)
-        self.indexes_subset = get_445_keypoints_indexes()
+        self.indexes_subset = get_indices()
+        self.flame = FLAMELayer(consts=FLAME_CONSTS)
 
     def __len__(self):
         return len(self.images)
+
+    def filter_images(self, image_files: List[str], mode: str):
+        filelist = os.path.join(self.data_dir, f"{mode}_files.txt")
+        if os.path.exists(filelist):
+            with open(filelist, "r") as f:
+                files = f.read().splitlines()
+            files = [x.split(".")[0] for x in files]
+            image_files = [x for x in image_files if os.path.basename(x).split(".")[0] in files]
+        return image_files
 
     def load_sample(self, index: int) -> PoseEstimationSample:
         """
@@ -67,16 +80,15 @@ class DAD3DHeadsDataset(AbstractPoseEstimationDataset):
         ann_path: str = self.ann_files[index]
 
         image = cv2.imread(image_path, cv2.IMREAD_COLOR)
-        image_height, image_width = image.shape[:2]
 
-        head_ann: SampleAnnotation = read_annotation(ann_path)
+        head_ann: SampleAnnotation = read_annotation(ann_path, self.flame)
 
         gt_joints = []
         gt_bboxes_xywh = []
 
         for head in head_ann.heads:
             coords = head.get_reprojected_points_in_absolute_coords()
-            gt_joints.append(coords[self.indexes_subset])
+            gt_joints.append(coords[self.indexes_subset["keypoint_445"]])
             gt_bboxes_xywh.append(head.get_face_bbox_xywh())
 
         gt_bboxes_xywh = np.array(gt_bboxes_xywh)
