@@ -39,6 +39,7 @@ optimizer_params:
 
 ema: True
 ema_params:
+  decay: 0.9997
   decay_type: exp
   beta: 50
 
@@ -101,7 +102,7 @@ phase_callbacks:
 
 pre_prediction_callback:
 
-metric_to_watch: 'YoloHeadsLoss/loss'
+metric_to_watch: 'KeypointsNME'
 greater_metric_to_watch_is_better: False
 
 _convert_: all
