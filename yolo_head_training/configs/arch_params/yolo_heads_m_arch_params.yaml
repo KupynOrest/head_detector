@@ -47,7 +47,7 @@ backbone:
     out_layers: [stage1, stage2, stage3, context_module]
 
 neck:
-  YoloNASPANNeckWithC2:
+  YoloHeadsNeck:
 
     neck1:
       YoloNASUpStage:
@@ -86,6 +86,22 @@ neck:
         activation_type: relu
         width_mult: 1
         depth_mult: 1
+
+    neck5:
+      YoloNASStage:
+        out_channels: 512
+        num_blocks: 2
+        activation_type: relu
+        hidden_channels: 384
+        concat_intermediates: False
+
+    neck6:
+      YoloNASStage:
+        out_channels: 512
+        num_blocks: 2
+        activation_type: relu
+        hidden_channels: 384
+        concat_intermediates: False
 
 heads:
   YoloHeadsNDFLHeads:
@@ -130,6 +146,31 @@ heads:
           stride: 32
           reg_max: 16
 
+      - YoloHeadsDFLHead:
+          bbox_inter_channels: 256
+          flame_inter_channels: 256
+          flame_regression_blocks: 2
+          flame_shape_inter_channels: 128
+          flame_expression_inter_channels: 64
+          flame_transformation_inter_channels: 16
+          shared_stem: False
+          width_mult: 0.75
+          first_conv_group_size: 0
+          stride: 64
+          reg_max: 16
+
+      - YoloHeadsDFLHead:
+          bbox_inter_channels: 256
+          flame_inter_channels: 256
+          flame_regression_blocks: 2
+          flame_shape_inter_channels: 128
+          flame_expression_inter_channels: 64
+          flame_transformation_inter_channels: 16
+          shared_stem: False
+          width_mult: 0.75
+          first_conv_group_size: 0
+          stride: 128
+          reg_max: 16
 
 bn_eps: 1e-6
 bn_momentum: 0.1
