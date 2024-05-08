@@ -135,6 +135,9 @@ class HeadAnnotation:
     def get_face_bbox_xywh(self):
         return np.array(self.bbox)
 
+    def get_face_bbox_area(self):
+        return self.bbox[2] * self.bbox[3]
+
     def get_face_bbox_xyxy(self):
         return np.array([self.bbox[0], self.bbox[1], self.bbox[0] + self.bbox[2], self.bbox[1] + self.bbox[3]])
 
