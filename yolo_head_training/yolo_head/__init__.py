@@ -7,6 +7,7 @@ from .yolo_head_loss import YoloHeadsLoss
 from .metrics import KeypointsNME, KeypointsFailureRate
 from .yolo_head_visualization_callback import ExtremeBatchYoloHeadsVisualizationCallback
 from .dataset import DAD3DHeadsDataset
+from .yolo_heads_neck import YoloHeadsNeck
 
 __all__ = [
     "ExtremeBatchYoloHeadsVisualizationCallback",
@@ -14,6 +15,7 @@ __all__ = [
     "YoloHeadsDFLHead",
     "YoloHeadsNDFLHeads",
     "YoloHeadsLoss",
+    "YoloHeadsNeck",
     "YoloHeadsPostPredictionCallback",
     "YoloHeads",
     "YoloHeads_M",
