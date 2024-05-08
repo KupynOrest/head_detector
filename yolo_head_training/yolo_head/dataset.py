@@ -14,6 +14,7 @@ from super_gradients.training.datasets.pose_estimation_datasets.abstract_pose_es
 )
 from super_gradients.training.samples import PoseEstimationSample
 from super_gradients.training.transforms.keypoint_transforms import AbstractKeypointTransform
+from tqdm import tqdm
 
 from yolo_head.dataset_parsing import read_annotation, SampleAnnotation
 from yolo_head.flame import get_indices, FLAMELayer, FLAME_CONSTS
@@ -53,10 +54,34 @@ class DAD3DHeadsDataset(AbstractPoseEstimationDataset):
             edge_colors=[],
             keypoint_colors=[(0, 255, 0)] * num_joints,
         )
+        self.flame = FLAMELayer(consts=FLAME_CONSTS)
+
+        if False:
+            # A check to keep only large boxes
+            keep_images = []
+            keep_anns = []
+
+            for image, ann_file in zip(tqdm(images), ann_files):
+                ann = read_annotation(ann_file, self.flame)
+                image_h, image_w = cv2.imread(image).shape[:2]
+                scale = 640 / max(image_h, image_w)
+
+                if len(ann.heads) == 0:
+                    continue
+
+                # Filter all images where minimal head is smaller than 192x192 in 640x640 image
+                min_head_area = min([head.get_face_bbox_area() * scale * scale for head in ann.heads])
+                if min_head_area < 192 * 192:
+                    continue
+                keep_images.append(image)
+                keep_anns.append(ann_file)
+
+            images = keep_images
+            ann_files = keep_anns
+
         self.images = np.array(images)
         self.ann_files = np.array(ann_files)
         self.indexes_subset = get_indices()
-        self.flame = FLAMELayer(consts=FLAME_CONSTS)
 
     def __len__(self):
         return len(self.images)
