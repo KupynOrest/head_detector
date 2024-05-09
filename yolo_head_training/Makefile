@@ -15,3 +15,6 @@ yolo_3dheads_m_large:
 
 yolo_heads_m_small_eugene:
 	python train.py --config-name=yolo_heads_m_small_eugene num_gpus=4 multi_gpu=DDP
+
+yolo_heads_m_extra_strides_small_eugene:
+	python train.py --config-name=yolo_heads_m_extra_strides_small_eugene num_gpus=4 multi_gpu=DDP
