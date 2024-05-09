@@ -146,6 +146,10 @@ class DAD3DHeadsDataset(AbstractPoseEstimationDataset):
         image = cv2.imread(image_path, cv2.IMREAD_COLOR)
 
         head_ann: SampleAnnotation = read_annotation(ann_path, self.flame)
+        if image is None:
+            print(self.images[index])
+            image = np.zeros((640, 640, 3), dtype=np.uint8)
+            head_ann = SampleAnnotation(heads=[])
 
         gt_joints = []
         gt_bboxes_xywh = []

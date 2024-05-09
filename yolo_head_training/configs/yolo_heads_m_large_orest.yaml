@@ -1,0 +1,44 @@
+defaults:
+  - training_hyperparams: vgg_head_train_params
+  - dataset_params: vgg_head_large
+  - arch_params: yolo_heads_m_arch_params
+  - checkpoint_params: default_checkpoint_params
+  - _self_
+  - variable_setup
+
+architecture: YoloHeads
+
+multi_gpu: On
+num_gpus: 4
+
+experiment_suffix: ""
+experiment_name: vgg_heads_m_${experiment_suffix}_${dataset_params.dataset_params_suffix}
+
+checkpoint_params:
+  # For training Yolo-NAS-S pose estimation model we use pretrained weights for Yolo-NAS-S object detection model.
+  # By setting strict_load: key_matching we load only those weights that match the keys of the model.
+  checkpoint_path: https://sghub.deci.ai/models/yolo_nas_m_coco.pth
+  strict_load:
+    _target_: super_gradients.training.sg_trainer.StrictLoad
+    value: key_matching
+
+dataset_params:
+  train_dataset_params:
+    data_dir: /work/okupyn/VGGHead/large
+
+  val_dataset_params:
+    data_dir: /work/okupyn/VGGHead/large
+
+  train_dataloader_params:
+    persistent_workers: True
+    batch_size: 48
+
+  val_dataloader_params:
+    persistent_workers: True
+    batch_size: 48
+
+
+hydra:
+  searchpath:
+    - configs
+    - pkg://super_gradients.recipes

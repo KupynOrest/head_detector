@@ -17,10 +17,7 @@ date +"%R activating conda env"
 conda activate head_det
 date +"%R starting script"
 cd /users/okupyn/head_detector/yolo_head_training || exit
-python train.py --config-name=yolo_heads_m \
-    dataset_params.train_dataset_params.data_dir=/work/okupyn/VGGHead/small \
-    dataset_params.val_dataset_params.data_dir=/work/okupyn/VGGHead/small \
-    num_gpus=4 multi_gpu=DDP
+python train.py --config-name=yolo_heads_m_large_orest num_gpus=4 multi_gpu=DDP
 
 
 date +"%R slurm job done"

@@ -8,7 +8,7 @@ def get_pipeline() -> StableDiffusionXLAdapterPipeline:
     ).to("cuda")
 
     # load euler_a scheduler
-    model_id = 'SG161222/RealVisXL_V4.0'
+    model_id = 'stabilityai/stable-diffusion-xl-base-1.0'
     pipe = StableDiffusionXLAdapterPipeline.from_pretrained(
         model_id, adapter=adapter, torch_dtype=torch.float16, variant="fp16",
     )
