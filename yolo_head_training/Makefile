@@ -18,3 +18,10 @@ yolo_heads_m_small_eugene:
 
 yolo_heads_m_extra_strides_small_eugene:
 	python train.py --config-name=yolo_heads_m_extra_strides_small_eugene num_gpus=4 multi_gpu=DDP
+
+yolo_heads_m_large_eugene:
+	python train.py --config-name=yolo_heads_m_large_eugene \
+    dataset_params.train_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/large \
+    dataset_params.val_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/large \
+    num_gpus=4 multi_gpu=DDP
+

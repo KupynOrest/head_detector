@@ -1,5 +1,6 @@
 import os
-from typing import List
+from pathlib import Path
+from typing import List, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -29,8 +30,9 @@ class DAD3DHeadsDataset(AbstractPoseEstimationDataset):
         self,
         data_dir: str,
         num_joints: int,
-        mode: str,
+        mode: Optional[str],
         transforms: List[AbstractKeypointTransform],
+        splits: Optional[List[str]] = None,
     ):
         """
 
@@ -39,13 +41,16 @@ class DAD3DHeadsDataset(AbstractPoseEstimationDataset):
 
         """
         self.data_dir = data_dir
-        images = fs.find_images_in_dir(os.path.join(data_dir, "images"))
-        images = self.filter_images(images, mode)
-        ann_files = [x.replace("images", "annotations").replace(".jpg", ".npz") for x in images]
 
-        for ann_file in ann_files:
-            if not os.path.exists(ann_file):
-                raise ValueError(f"Annotation file not found: {ann_file}")
+        if splits is not None:
+            images = []
+            ann_files = []
+            for split in splits:
+                split_images, split_anns = self.get_images_and_annotations(os.path.join(data_dir, split))
+                images.extend(split_images)
+                ann_files.extend(split_anns)
+        else:
+            images, ann_files = self.get_images_and_annotations(data_dir, mode=mode)
 
         super().__init__(
             transforms=transforms,
@@ -86,14 +91,48 @@ class DAD3DHeadsDataset(AbstractPoseEstimationDataset):
     def __len__(self):
         return len(self.images)
 
-    def filter_images(self, image_files: List[str], mode: str):
-        filelist = os.path.join(self.data_dir, f"{mode}_files.txt")
-        if os.path.exists(filelist):
+    @classmethod
+    def get_images_and_annotations(cls, data_dir: str, mode=None) -> Tuple[List[str], List[str]]:
+        data_dir = Path(data_dir)
+
+        images_dir = data_dir / "images"
+        excluded_files_list = data_dir / "files.txt"
+        if excluded_files_list.exists():
+            with excluded_files_list.open("r") as f:
+                excluded_files = f.read().splitlines()
+        else:
+            logger.info(f"Excluded files list not found: {excluded_files_list}")
+            excluded_files = []
+
+        images = list(sorted(images_dir.glob("*.jpg")))
+        images = [str(x) for x in images if os.path.basename(x) not in excluded_files]
+        ann_files = [x.replace("images", "annotations").replace(".jpg", ".npz") for x in images]
+
+        keep_images = []
+        keep_anns = []
+        for image_file, ann_file in zip(images, ann_files):
+            if not os.path.exists(ann_file):
+                logger.warning(f"Annotation file not found: {ann_file}")
+                continue
+            keep_images.append(image_file)
+            keep_anns.append(ann_file)
+
+        images = keep_images
+        ann_files = keep_anns
+
+        if mode is not None:
+            filelist = os.path.join(data_dir, f"{mode}_files.txt")
             with open(filelist, "r") as f:
                 files = f.read().splitlines()
-            files = [x.split(".")[0] for x in files]
-            image_files = [x for x in image_files if os.path.basename(x).split(".")[0] in files]
-        return image_files
+            files_to_keep = [os.path.basename(x).split(".")[0] for x in files]
+
+            for image_file, ann_file in zip(images, ann_files):
+                if os.path.basename(image_file).split(".")[0] not in files_to_keep:
+                    continue
+                keep_images.append(image_file)
+                keep_anns.append(ann_file)
+
+        return keep_images, keep_anns
 
     def load_sample(self, index: int) -> PoseEstimationSample:
         """
