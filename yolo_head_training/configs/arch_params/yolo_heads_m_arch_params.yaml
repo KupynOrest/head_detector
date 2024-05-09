@@ -1,5 +1,5 @@
 in_channels: 3
-num_classes: 413
+num_classes: 410
 
 backbone:
   NStageBackbone:

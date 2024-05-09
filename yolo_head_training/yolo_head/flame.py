@@ -22,6 +22,17 @@ from torch import Tensor
 FLAME_CONSTS = {
     "shape": 300,
     "expression": 100,
+    "rotation": 3,
+    "jaw": 3,
+    "eyeballs": 0,
+    "neck": 0,
+    "translation": 3,
+    "scale": 1,
+}
+
+FLAME_CONSTS_DAD = {
+    "shape": 300,
+    "expression": 100,
     "rotation": 6,
     "jaw": 3,
     "eyeballs": 0,
@@ -269,7 +280,7 @@ class FLAMELayer(nn.Module):
         vertices = self.forward(new_flame_params, zero_rot, zero_jaw)
         return einops.rearrange(vertices, "(b a) v c -> b a v c", a=a)
 
-    def forward(self, flame_params: FlameParams, zero_rot: bool = False, zero_jaw: bool = False) -> torch.Tensor:
+    def forward(self, flame_params: FlameParams, zero_rot: bool = False, zero_jaw: bool = False, dof6 : bool = False) -> torch.Tensor:
         """
         Input:
             shape_params: B X number of shape parameters
@@ -292,7 +303,9 @@ class FLAMELayer(nn.Module):
         eyeballs = flame_params.eyeballs if not (0 in flame_params.eyeballs.shape) else self.eyeballs[[0]].expand(bs, -1)
         jaw = flame_params.jaw if not (0 in flame_params.jaw.shape) else self.jaw[[0]].expand(bs, -1)
 
-        rotation = torch.zeros([bs, ROT_COEFFS], device=flame_params.rotation.device)
+        rotation = flame_params.rotation if not (0 in flame_params.rotation.shape) else self.rot[[0]].expand(bs, -1)
+        if zero_rot or dof6:
+            rotation = torch.zeros([bs, ROT_COEFFS], device=flame_params.rotation.device)
         if zero_jaw:
             jaw = torch.zeros_like(jaw)
         full_pose = torch.cat([rotation, neck_pose, jaw, eyeballs], dim=1)
@@ -310,9 +323,9 @@ class FLAMELayer(nn.Module):
             self.lbs_weights,
         )
 
-        # translate to skull center and rotate
-        vertices[:, :, 2] += MESH_OFFSET_Z
-        if not zero_rot:
+        if dof6:
+            # translate to skull center and rotate
+            vertices[:, :, 2] += MESH_OFFSET_Z
             rotation_mat = rot_mat_from_6dof(flame_params.rotation).type(vertices.dtype)
             vertices = torch.matmul(rotation_mat.unsqueeze(1), vertices.unsqueeze(-1))
             vertices = vertices[..., 0]

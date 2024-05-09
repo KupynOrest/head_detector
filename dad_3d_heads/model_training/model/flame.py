@@ -17,7 +17,7 @@ from torch import Tensor
 FLAME_CONSTS = {
     "shape": 300,
     "expression": 100,
-    "rotation": 6,
+    "rotation": 3,
     "jaw": 3,
     "eyeballs": 0,
     "neck": 0,
