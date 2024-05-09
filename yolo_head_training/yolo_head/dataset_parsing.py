@@ -171,7 +171,7 @@ def get_vertices(annotation: Dict[str, np.ndarray], index: int, flame) -> Tuple[
         return np.array(annotation["3d_vertices"][index], dtype=np.float32), \
                np.array(annotation["projected_vertices"][index][0], dtype=np.float32)
     flame_params = FlameParams.from_3dmm(torch.from_numpy(annotation["3dmm_params"][index]), flame.flame_constants)
-    vertices = flame.forward(flame_params, zero_rot=False, dof6=True)
+    vertices = flame.forward(flame_params, zero_rot=False)
     scale = torch.clamp(flame_params.scale[:, None] + 1.0, 1e-8)
     vertices *= scale  # [B, 1, 1]
     flame_params.translation[..., 2] = 0.0

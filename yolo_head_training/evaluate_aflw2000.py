@@ -150,7 +150,7 @@ def draw_pose(rpy: RPY, image: np.ndarray) -> np.ndarray:
 
 def main(model_name="YoloHeads_M", checkpoint="C:/Develop/GitHub/VGG/head_detector/yolo_head_training/weights/ckpt_best.pth", dataset_dir="g:/AFLW2000"):
     images, labels = find_images_and_labels(dataset_dir)
-    model = models.get(model_name, checkpoint_path=checkpoint, num_classes=410).eval() # 412 is total number of flame params
+    model = models.get(model_name, checkpoint_path=checkpoint, num_classes=413).eval() # 412 is total number of flame params
     metrics = {
         "roll": [],
         "pitch": [],
