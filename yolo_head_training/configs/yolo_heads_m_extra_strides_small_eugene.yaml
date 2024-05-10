@@ -12,7 +12,7 @@ multi_gpu: Off
 num_gpus: 1
 
 experiment_suffix: ""
-experiment_name: yolo_heads_m_extra_strides_${experiment_suffix}_${dataset_params.dataset_params_suffix}
+experiment_name: ${hydra:runtime.choices.arch_params}_${hydra:runtime.choices.dataset_params}_${experiment_suffix}
 
 checkpoint_params:
   # For training Yolo-NAS-S pose estimation model we use pretrained weights for Yolo-NAS-S object detection model.

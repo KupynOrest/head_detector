@@ -1,6 +1,6 @@
 defaults:
   - training_hyperparams: vgg_head_train_params
-  - dataset_params: vgg_head
+  - dataset_params: vgg_head_small_albu_augs
   - arch_params: yolo_heads_m_arch_params
   - checkpoint_params: default_checkpoint_params
   - _self_
@@ -12,7 +12,7 @@ multi_gpu: Off
 num_gpus: 1
 
 experiment_suffix: ""
-experiment_name: vgg_head_${architecture}_${experiment_suffix}_${dataset_params.dataset_params_suffix}
+experiment_name: ${hydra:runtime.choices.arch_params}_${hydra:runtime.choices.dataset_params}_${experiment_suffix}
 
 checkpoint_params:
   # For training Yolo-NAS-S pose estimation model we use pretrained weights for Yolo-NAS-S object detection model.
@@ -24,10 +24,10 @@ checkpoint_params:
 
 dataset_params:
   train_dataset_params:
-    data_dir: /home/bloodaxe/data/VGGHead/small
+    data_dir: g:\VGGHead\okupyn-20240506-VGGHead\VGGHead\small
 
   val_dataset_params:
-    data_dir: /home/bloodaxe/data/VGGHead/small
+    data_dir: g:\VGGHead\okupyn-20240506-VGGHead\VGGHead\small
 
   train_dataloader_params:
     persistent_workers: True
