@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Union, Optional
 
 from dataclasses import dataclass
+import tqdm
 import numpy as np
 import torch
 from fire import Fire
@@ -157,7 +158,7 @@ def main(model_name="YoloHeads_M", checkpoint="C:/Develop/GitHub/VGG/head_detect
         "yaw": [],
     }
     index = 0
-    for image_path, gt in zip(images[:20], labels[:20]):
+    for image_path, gt in tqdm.tqdm(zip(images, labels)):
         image = cv2.imread(str(image_path))
         gt_image = image.copy()
         # image = cv2.resize(image, (640, 640))
@@ -171,12 +172,12 @@ def main(model_name="YoloHeads_M", checkpoint="C:/Develop/GitHub/VGG/head_detect
         metrics["roll"].append(mae(gt_pose.roll, pred_pose.roll))
         metrics["pitch"].append(mae(gt_pose.pitch, pred_pose.pitch))
         metrics["yaw"].append(mae(gt_pose.yaw, pred_pose.yaw))
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        image = draw_2d_keypoints(image[..., ::-1], predictions.predicted_2d_vertices.reshape(-1, 2))
-        image = draw_pose(pred_pose, image)
+        #image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        #image = draw_2d_keypoints(image[..., ::-1], predictions.predicted_2d_vertices.reshape(-1, 2))
+        #image = draw_pose(pred_pose, image)
         gt_image = draw_pose(gt_pose, gt_image)
-        cv2.imwrite(f"output/{index}.jpg", np.hstack((image, gt_image)))
-        index += 1
+        #cv2.imwrite(f"output/{index}.jpg", np.hstack((image, gt_image)))
+        #index += 1
 
     roll_mae = np.mean(np.array(metrics["roll"]))
     pitch_mae = np.mean(np.array(metrics["pitch"]))

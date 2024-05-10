@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=vgghead_train
-#SBATCH --time=3-00:00:00
+#SBATCH --time=4-00:00:00
 #SBATCH --mem=128G
 #SBATCH --partition=gpu
 #SBATCH --nodes=1

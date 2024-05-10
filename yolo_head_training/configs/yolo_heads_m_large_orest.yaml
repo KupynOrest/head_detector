@@ -7,6 +7,7 @@ defaults:
   - variable_setup
 
 architecture: YoloHeads
+ckpt_root_dir: /work/okupyn
 
 multi_gpu: On
 num_gpus: 4

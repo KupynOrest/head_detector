@@ -85,7 +85,7 @@ class DataGenerator:
                     negative_prompt=NEGATIVE_PROMPT,
                     image=Image.fromarray(pose_image),
                     num_inference_steps=40,
-                    adapter_conditioning_scale=0.8,
+                    adapter_conditioning_scale=0.7,
                     guidance_scale=7.0,
                 ).images[0]
                 if self.safety_checker(np.array(image)):

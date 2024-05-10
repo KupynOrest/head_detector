@@ -38,7 +38,7 @@ class SafetyClassifier:
         if model_path is None or not os.path.exists(model_path):
             raise ValueError("saved_model_path must be the valid directory of a saved model to load.")
 
-        model = tf.keras.layers.TFSMLayer(model_path, call_endpoint="serving_default")
+        model = tf.keras.models.load_model(model_path, custom_objects={'KerasLayer': hub.KerasLayer}, compile=False)
         return model
 
     def classify(self, image):

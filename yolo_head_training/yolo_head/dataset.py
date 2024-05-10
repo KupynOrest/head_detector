@@ -1,4 +1,5 @@
 import os
+import random
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -145,11 +146,13 @@ class DAD3DHeadsDataset(AbstractPoseEstimationDataset):
 
         image = cv2.imread(image_path, cv2.IMREAD_COLOR)
 
-        head_ann: SampleAnnotation = read_annotation(ann_path, self.flame)
         if image is None:
-            print(self.images[index])
-            image = np.zeros((640, 640, 3), dtype=np.uint8)
-            head_ann = SampleAnnotation(heads=[])
+            new_index = random.randint(0, 1000)
+            image_path = self.images[new_index]
+            ann_path = self.ann_files[new_index]
+            image = cv2.imread(image_path, cv2.IMREAD_COLOR)
+
+        head_ann: SampleAnnotation = read_annotation(ann_path, self.flame)
 
         gt_joints = []
         gt_bboxes_xywh = []
