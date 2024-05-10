@@ -127,6 +127,9 @@ class DAD3DHeadsDataset(AbstractPoseEstimationDataset):
                 files = f.read().splitlines()
             files_to_keep = [os.path.basename(x).split(".")[0] for x in files]
 
+            keep_images = []
+            keep_anns = []
+
             for image_file, ann_file in zip(images, ann_files):
                 if os.path.basename(image_file).split(".")[0] not in files_to_keep:
                     continue
