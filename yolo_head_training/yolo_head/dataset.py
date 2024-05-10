@@ -34,6 +34,7 @@ class DAD3DHeadsDataset(AbstractPoseEstimationDataset):
         mode: Optional[str],
         transforms: List[AbstractKeypointTransform],
         splits: Optional[List[str]] = None,
+        crop_bbox_to_visible_keypoints: bool = False,
     ):
         """
 
@@ -61,6 +62,7 @@ class DAD3DHeadsDataset(AbstractPoseEstimationDataset):
             keypoint_colors=[(0, 255, 0)] * num_joints,
         )
         self.flame = FLAMELayer(consts=FLAME_CONSTS)
+        self.crop_bbox_to_visible_keypoints = crop_bbox_to_visible_keypoints
 
         if False:
             # A check to keep only large boxes
@@ -189,7 +191,7 @@ class DAD3DHeadsDataset(AbstractPoseEstimationDataset):
         sample = self.transforms.apply_to_sample(sample)
 
         # Update bounding boxes and areas to match the visible joints area
-        if False:
+        if self.crop_bbox_to_visible_keypoints:
             if len(sample.joints):
                 visible_joints = sample.joints[:, :, 2] > 0
                 xmax = np.max(sample.joints[:, :, 0], axis=-1, where=visible_joints, initial=sample.joints[:, :, 0].min())

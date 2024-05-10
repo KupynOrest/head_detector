@@ -74,12 +74,13 @@ valid_metrics_list:
 #        pre_nms_max_predictions: 300
 #        post_nms_max_predictions: 30
 
+visualization_frequency_epochs: 10
 
 phase_callbacks:
   - ExtremeBatchYoloHeadsVisualizationCallback:
       loss_to_monitor: YoloHeadsLoss/loss
       max: True
-      freq: 10
+      freq: ${training_params.visualization_frequency_epochs}
       max_images: 16
       enable_on_train_loader: True
       enable_on_valid_loader: True

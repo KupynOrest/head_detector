@@ -1,0 +1,9 @@
+defaults:
+  - vgg_head_small_albu_augs
+  - _self_
+
+train_dataset_params:
+  crop_bbox_to_visible_keypoints: True
+
+val_dataset_params:
+  crop_bbox_to_visible_keypoints: True
