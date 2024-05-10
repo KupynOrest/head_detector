@@ -184,6 +184,28 @@ class DAD3DHeadsDataset(AbstractPoseEstimationDataset):
             additional_samples=None,
         )
 
+    def __getitem__(self, index: int) -> PoseEstimationSample:
+        sample = self.load_sample(index)
+        sample = self.transforms.apply_to_sample(sample)
+
+        # Update bounding boxes and areas to match the visible joints area
+        if False:
+            if len(sample.joints):
+                visible_joints = sample.joints[:, :, 2] > 0
+                xmax = np.max(sample.joints[:, :, 0], axis=-1, where=visible_joints, initial=sample.joints[:, :, 0].min())
+                xmin = np.min(sample.joints[:, :, 0], axis=-1, where=visible_joints, initial=sample.joints[:, :, 0].max())
+                ymax = np.max(sample.joints[:, :, 1], axis=-1, where=visible_joints, initial=sample.joints[:, :, 1].min())
+                ymin = np.min(sample.joints[:, :, 1], axis=-1, where=visible_joints, initial=sample.joints[:, :, 1].max())
+
+                w = xmax - xmin
+                h = ymax - ymin
+                raw_area = w * h
+                area = np.clip(raw_area, a_min=0, a_max=None) * (visible_joints.sum(axis=-1, keepdims=False) > 1)
+                sample.bboxes_xywh = np.stack([xmin, ymin, w, h], axis=1)
+                sample.areas = area
+
+        return sample
+
     def get_dataset_preprocessing_params(self) -> dict:
         """
         This method returns a dictionary of parameters describing preprocessing steps to be applied to the dataset.
