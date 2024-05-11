@@ -44,3 +44,10 @@ yolo_heads_m_small_medium_albu_augs:
     dataset_params.val_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/small \
     num_gpus=4 multi_gpu=DDP
 
+
+yolo_heads_m_large_medium_albu_augs_eugene:
+	python train.py --config-name=yolo_heads_m_large_medium_albu_augs_eugene \
+    dataset_params.train_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/large \
+    dataset_params.val_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/large \
+    num_gpus=4 multi_gpu=DDP
+

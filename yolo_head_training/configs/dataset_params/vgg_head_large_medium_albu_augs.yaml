@@ -4,10 +4,10 @@ defaults:
 
 # This is a shortcut parameter to set size of training & validation images.
 image_size: 640
-dataset_params_suffix: "large_${dataset_params.image_size}"
+dataset_params_suffix: "small_${dataset_params.image_size}"
 
 train_dataset_params:
-  data_dir: g:\VGGHead\okupyn-20240506-VGGHead\VGGHead\large
+  data_dir: g:/VGGHead/train
   num_joints: ${dataset_params.num_joints}
   mode:
   splits:
@@ -111,16 +111,42 @@ train_dataset_params:
     - split_00099
 
   transforms:
+    - Albumentations:
+        Compose:
+          bbox_params:
+            min_width: 8
+            min_area: 10
+            min_height: 8
+            check_each_transform: True
+            min_visibility: 0.1
+
+          keypoint_params: {}
+          transforms:
+            - ImageCompression:
+                quality_lower: 60
+                quality_upper: 100
+                p: 0.25
+            - MedianBlur:
+                blur_limit: 5
+                p: 0.125
+            - GaussianBlur:
+                blur_limit: 5
+                p: 0.125
+            - RGBShift:
+                p: 0.125
+            - ToGray:
+                p: 0.125
+
     - KeypointsBrightnessContrast:
         brightness_range: [ 0.8, 1.2 ]
         contrast_range: [ 0.8, 1.2 ]
-        prob: 1.0
+        prob: 0.5
 
     - KeypointsHSV:
         hgain: 20
         sgain: 20
         vgain: 20
-        prob: 1.0
+        prob: 0.5
 
     - KeypointsRandomAffineTransform:
         max_rotation: 45
@@ -129,14 +155,14 @@ train_dataset_params:
         max_translate: 0.1
         image_pad_value: 127
         mask_pad_value: 1
-        prob: 1.0
-        interpolation_mode: [ 0, 1, 2, 3, 4 ]
+        prob: 0.5
+        interpolation_mode: [0, 1, 2, 3, 4]
 
     - KeypointsRandomRotate90:
-        prob: 1.0
+        prob: 0.5
 
-    #    - KeypointsMosaic:
-    #        prob: 0.5
+#    - KeypointsMosaic:
+#        prob: 0.5
 
     - KeypointsLongestMaxSize:
         max_height: ${dataset_params.image_size}
@@ -145,7 +171,7 @@ train_dataset_params:
     - KeypointsPadIfNeeded:
         min_height: ${dataset_params.image_size}
         min_width: ${dataset_params.image_size}
-        image_pad_value: [ 127, 127, 127 ]
+        image_pad_value: [127, 127, 127]
         mask_pad_value: 1
         padding_mode: center
 
@@ -158,7 +184,7 @@ train_dataset_params:
 
 
 val_dataset_params:
-  data_dir: g:\VGGHead\okupyn-20240506-VGGHead\VGGHead\large\
+  data_dir: g:/VGGHead/val
   num_joints: ${dataset_params.num_joints}
   mode:
   splits:
