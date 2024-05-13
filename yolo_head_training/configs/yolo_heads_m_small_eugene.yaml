@@ -1,6 +1,6 @@
 defaults:
   - training_hyperparams: vgg_head_train_params
-  - dataset_params: vgg_head
+  - dataset_params: vgg_head_small_medium_albu_augs
   - arch_params: yolo_heads_m_arch_params
   - checkpoint_params: default_checkpoint_params
   - _self_

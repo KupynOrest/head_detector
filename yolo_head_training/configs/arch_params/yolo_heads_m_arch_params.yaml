@@ -97,6 +97,8 @@ heads:
           flame_regression_blocks: 2
           flame_shape_inter_channels: 128
           flame_expression_inter_channels: 64
+          flame_shape_out_channels: 64
+          flame_expression_out_channels: 32
           flame_transformation_inter_channels: 16
           shared_stem: False
           width_mult: 0.75
@@ -110,6 +112,8 @@ heads:
           flame_regression_blocks: 2
           flame_shape_inter_channels: 128
           flame_expression_inter_channels: 64
+          flame_shape_out_channels: 64
+          flame_expression_out_channels: 32
           flame_transformation_inter_channels: 16
           shared_stem: False
           width_mult: 0.75
@@ -123,6 +127,8 @@ heads:
           flame_regression_blocks: 2
           flame_shape_inter_channels: 128
           flame_expression_inter_channels: 64
+          flame_shape_out_channels: 64
+          flame_expression_out_channels: 32
           flame_transformation_inter_channels: 16
           shared_stem: False
           width_mult: 0.75

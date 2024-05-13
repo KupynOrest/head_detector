@@ -160,12 +160,12 @@ class YoloHeadsNDFLHeads(BaseDetectionModule, SupportsReplaceNumClasses):
         pred_scores = cls_score_list.sigmoid()
         pred_bboxes = batch_distance2bbox(anchor_points_inference, reg_dist_reduced_list) * stride_tensor  # [B, Anchors, 4]
 
-        box_size = torch.sqrt((pred_bboxes[:, :, 3] - pred_bboxes[:, :, 1]) * (pred_bboxes[:, :, 2] - pred_bboxes[:, :, 0]))
+        #box_size = torch.sqrt((pred_bboxes[:, :, 3] - pred_bboxes[:, :, 1]) * (pred_bboxes[:, :, 2] - pred_bboxes[:, :, 0]))
 
         flame_params_list = torch.cat(flame_params_list, dim=-1)  # [B, Num Flame Params, Anchors]
         flame_params = FlameParams.from_3dmm(flame_params_list, FLAME_CONSTS)
         flame_params.translation[:, 0:2] += einops.rearrange(centers, "A N -> 1 N A")
-        flame_params.scale *= box_size[:, None, :] / 2
+        flame_params.scale *= stride_tensor[None, None, : , 0]
         flame_params = flame_params.to_3dmm_tensor()  # [B, Num Flame Params, Anchors]
         flame_params = einops.rearrange(flame_params, "B F A -> B A F")  # Rearrange to common format where anchors comes first
 

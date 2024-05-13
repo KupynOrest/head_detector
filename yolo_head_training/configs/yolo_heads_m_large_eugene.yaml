@@ -1,6 +1,6 @@
 defaults:
   - training_hyperparams: vgg_head_train_params
-  - dataset_params: vgg_head_large
+  - dataset_params: vgg_head_large_medium_albu_augs_crop_box
   - arch_params: yolo_heads_m_arch_params
   - checkpoint_params: default_checkpoint_params
   - _self_
@@ -11,7 +11,7 @@ architecture: YoloHeads
 multi_gpu: Off
 num_gpus: 1
 
-experiment_suffix: ""
+experiment_suffix: "_new_flame"
 experiment_name: ${hydra:runtime.choices.arch_params}_${hydra:runtime.choices.dataset_params}_${experiment_suffix}
 
 checkpoint_params:

@@ -26,6 +26,8 @@ class YoloHeadsDFLHead(BaseDetectionModule):
         in_channels: int,
         bbox_inter_channels: int,
         flame_inter_channels: int,
+        flame_shape_out_channels: int,
+        flame_expression_out_channels: int,
         flame_shape_inter_channels: int,
         flame_expression_inter_channels: int,
         flame_transformation_inter_channels: int,
@@ -98,10 +100,10 @@ class YoloHeadsDFLHead(BaseDetectionModule):
         self.cls_pred = nn.Conv2d(bbox_inter_channels, 1, 1, 1, 0)
 
         self.flame_shape_pred = self.build_flame_regression_layers(
-            flame_inter_channels, flame_shape_inter_channels, flame_regression_blocks, FLAME_CONSTS["shape"]
+            flame_inter_channels, flame_shape_inter_channels, flame_regression_blocks, flame_shape_out_channels
         )
         self.flame_expression_pred = self.build_flame_regression_layers(
-            flame_inter_channels, flame_expression_inter_channels, flame_regression_blocks, FLAME_CONSTS["expression"]
+            flame_inter_channels, flame_expression_inter_channels, flame_regression_blocks, flame_expression_out_channels
         )
         self.flame_rotation_pred = self.build_flame_regression_layers(
             flame_inter_channels, flame_transformation_inter_channels, flame_regression_blocks, FLAME_CONSTS["rotation"]
@@ -164,6 +166,21 @@ class YoloHeadsDFLHead(BaseDetectionModule):
         flame_jaw = self.flame_jaw_pred(pose_features)
         flame_translation = self.flame_translation_pred(pose_features)
         flame_scale = self.flame_scale_pred(pose_features).exp() / 0.05
+
+        # Pad if necessary along channels dim to FLAME_CONSTS["shape"]
+        flame_shape = torch.nn.functional.pad(flame_shape, (0, 0, 0, 0, 0, FLAME_CONSTS["shape"] - flame_shape.size(1)))
+
+        flame_expression = torch.nn.functional.pad(
+            flame_expression,
+            (
+                0,
+                0,
+                0,
+                0,
+                0,
+                FLAME_CONSTS["expression"] - flame_expression.size(1),
+            ),
+        )
 
         flame_output = torch.cat([flame_shape, flame_expression, flame_rotation, flame_jaw, flame_translation, flame_scale], dim=1)
 

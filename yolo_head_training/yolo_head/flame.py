@@ -37,7 +37,7 @@ def rot_mat_from_6dof(v: torch.Tensor) -> torch.Tensor:
     vx, vy = v[..., :3].clone(), v[..., 3:].clone()
 
     b1 = F.normalize(vx, dim=-1)
-    b3 = F.normalize(torch.cross(b1, vy), dim=-1)
+    b3 = F.normalize(torch.cross(b1, vy, dim=-1), dim=-1)
     b2 = -torch.cross(b1, b3)
 
     return torch.stack((b1, b2, b3), dim=-1)
