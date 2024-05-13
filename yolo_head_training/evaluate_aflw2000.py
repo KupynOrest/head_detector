@@ -16,9 +16,11 @@ from super_gradients.training.utils.utils import infer_model_device
 from yolo_head.dataset_parsing import draw_2d_keypoints
 from yolo_head.flame import FlameParams, FLAME_CONSTS, rot_mat_from_6dof
 from yolo_head.yolo_heads_predictions import YoloHeadsPredictions
+from pytorch_toolbelt.utils import vstack_header
 
 
 MAX_ROTATION = 99
+MAE_THRESHOLD = 40
 
 @dataclass
 class RPY:
@@ -69,7 +71,7 @@ def predict_on_image(model, image, dsize=640):
     image_input = torch.from_numpy(image).to(device).permute(2, 0, 1).unsqueeze(0).float() / 255.0
 
     raw_predictions = model(image_input)
-    (predictions,) = model.get_post_prediction_callback(conf=0.1, iou=0.5)(raw_predictions)
+    (predictions,) = model.get_post_prediction_callback(conf=0.1, iou=0.5, post_nms_max_predictions=1)(raw_predictions)
 
     predictions: YoloHeadsPredictions = predictions
     predictions.predicted_2d_vertices /= scale # There are 565 keypoints subset here
@@ -77,10 +79,6 @@ def predict_on_image(model, image, dsize=640):
 
     flame = FlameParams.from_3dmm(predictions.mm_params, FLAME_CONSTS)
     flame.scale /= scale
-
-    print(flame.rotation)
-    print("===========================================")
-
     predictions.mm_params = flame.to_3dmm_tensor()
 
     return predictions, flame
@@ -128,24 +126,7 @@ def mae(x, y):
 
 
 def draw_pose(rpy: RPY, image: np.ndarray) -> np.ndarray:
-    roll, pitch, yaw = rpy.roll, rpy.pitch, rpy.yaw
-    tdx, tdy = image.shape[1] // 2, image.shape[0] // 2
-
-    size = image.shape[0] // 10
-
-    x1 = size * (np.cos(yaw) * np.cos(roll)) + tdx
-    y1 = size * (np.cos(pitch) * np.sin(roll) + np.cos(roll) * np.sin(pitch) * np.sin(yaw)) + tdy
-
-    x2 = size * (-np.cos(yaw) * np.sin(roll)) + tdx
-    y2 = size * (np.cos(pitch) * np.cos(roll) - np.sin(pitch) * np.sin(yaw) * np.sin(roll)) + tdy
-
-    x3 = size * (np.sin(yaw)) + tdx
-    y3 = size * (-np.cos(yaw) * np.sin(pitch)) + tdy
-
-    cv2.arrowedLine(image, (int(tdx), int(tdy)), (int(x1), int(y1)), (0, 0, 255), int(image.shape[0] * 0.005))
-    cv2.arrowedLine(image, (int(tdx), int(tdy)), (int(x2), int(y2)), (0, 255, 0), int(image.shape[0] * 0.005))
-    cv2.arrowedLine(image, (int(tdx), int(tdy)), (int(x3), int(y3)), (255, 0, 0), int(image.shape[0] * 0.005))
-
+    image = vstack_header(image, f"Roll: {rpy.roll:.2f}, Pitch: {rpy.pitch:.2f}, Yaw: {rpy.yaw:.2f}")
     return image
 
 
@@ -159,30 +140,37 @@ def main(model_name="YoloHeads_M", checkpoint="C:/Develop/GitHub/VGG/head_detect
     }
     index = 0
     for image_path, gt in tqdm.tqdm(zip(images, labels)):
-        image = cv2.imread(str(image_path))
-        gt_image = image.copy()
-        # image = cv2.resize(image, (640, 640))
-        predictions, flame_params = predict_on_image(model, image)
-        pred_pose = calculate_rpy(flame_params)
-        gt_pose = get_ground_truth(str(gt))
-        print(pred_pose, gt_pose)
-        if gt_pose is None:
-            continue
-
-        metrics["roll"].append(mae(gt_pose.roll, pred_pose.roll))
-        metrics["pitch"].append(mae(gt_pose.pitch, pred_pose.pitch))
-        metrics["yaw"].append(mae(gt_pose.yaw, pred_pose.yaw))
-        #image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        #image = draw_2d_keypoints(image[..., ::-1], predictions.predicted_2d_vertices.reshape(-1, 2))
-        #image = draw_pose(pred_pose, image)
-        gt_image = draw_pose(gt_pose, gt_image)
-        #cv2.imwrite(f"output/{index}.jpg", np.hstack((image, gt_image)))
-        #index += 1
+        try:
+            image = cv2.imread(str(image_path))
+            gt_image = image.copy()
+            # image = cv2.resize(image, (640, 640))
+            predictions, flame_params = predict_on_image(model, image)
+            pred_pose = calculate_rpy(flame_params)
+            gt_pose = get_ground_truth(str(gt))
+            if gt_pose is None:
+                continue
+            roll_mae = mae(gt_pose.roll, pred_pose.roll)
+            pitch_mae = mae(gt_pose.pitch, pred_pose.pitch)
+            yaw_mae = mae(gt_pose.yaw, pred_pose.yaw)
+            if roll_mae > MAE_THRESHOLD or pitch_mae > MAE_THRESHOLD or yaw_mae > MAE_THRESHOLD:
+                image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+                image = draw_2d_keypoints(image[..., ::-1], predictions.predicted_2d_vertices.reshape(-1, 2))
+                image = draw_pose(pred_pose, image)
+                gt_image = draw_pose(gt_pose, gt_image)
+                cv2.imwrite(f"output/{index}.jpg", np.hstack((image, gt_image)))
+                index += 1
+            else:
+                metrics["roll"].append(mae(gt_pose.roll, pred_pose.roll))
+                metrics["pitch"].append(mae(gt_pose.pitch, pred_pose.pitch))
+                metrics["yaw"].append(mae(gt_pose.yaw, pred_pose.yaw))
+        except Exception as e:
+            print(f"Failed to process image {image_path}: {e}")
 
     roll_mae = np.mean(np.array(metrics["roll"]))
     pitch_mae = np.mean(np.array(metrics["pitch"]))
     yaw_mae = np.mean(np.array(metrics["yaw"]))
     print(f"Roll MAE: {roll_mae}, Pitch MAE: {pitch_mae}, Yaw MAE: {yaw_mae}, MAE = {(roll_mae + pitch_mae + yaw_mae) / 3}")
+    print(f"Fail Cases: {index}")
 
 
 if __name__ == "__main__":
