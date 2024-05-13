@@ -164,15 +164,17 @@ class DAD3DHeadsDataset(AbstractPoseEstimationDataset):
 
         for head in head_ann.heads:
             coords = head.get_reprojected_points_in_absolute_coords()
-            gt_joints.append(coords[self.indexes_subset["keypoint_445"]])
+            # gt_joints.append(coords[self.indexes_subset["keypoint_445"]])
+            gt_joints.append(coords)
             gt_bboxes_xywh.append(head.get_face_bbox_xywh())
 
         gt_bboxes_xywh = np.array(gt_bboxes_xywh).reshape(-1, 4)
         gt_iscrowd = np.zeros(len(gt_joints), dtype=bool).reshape(-1)
         gt_areas = np.prod(gt_bboxes_xywh[:, 2:], axis=1)
 
-        num_keypoints = len(self.indexes_subset["keypoint_445"])
-        gt_joints = np.stack(gt_joints).reshape(-1, num_keypoints, 2)
+        num_instances = len(gt_joints)
+        # num_keypoints = len(self.indexes_subset["keypoint_445"])
+        gt_joints = np.stack(gt_joints).reshape(num_instances, -1, 2)
         # Add a 1 to the last dimension to get [N, Num Keypoints, 3]
         gt_joints = np.concatenate([gt_joints, np.ones((gt_joints.shape[0], gt_joints.shape[1], 1), dtype=gt_joints.dtype)], axis=-1)
 

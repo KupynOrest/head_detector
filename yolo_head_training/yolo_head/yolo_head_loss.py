@@ -1,5 +1,6 @@
 import dataclasses
-from typing import Mapping, Tuple, Optional
+import random
+from typing import Mapping, Tuple, Optional, Union
 
 import einops
 import torch
@@ -242,7 +243,6 @@ class YoloHeadsLoss(nn.Module):
     def __init__(
         self,
         oks_sigma: float,
-        num_joints: int,
         classification_loss_type: str = "focal",
         regression_iou_loss_type: str = "ciou",
         classification_loss_weight: float = 1.0,
@@ -256,6 +256,7 @@ class YoloHeadsLoss(nn.Module):
         assigner_multiply_by_pose_oks: bool = False,
         rescale_pose_loss_with_assigned_score: bool = False,
         average_losses_in_ddp: bool = False,
+        indexes_subset: Union[None, float, str] = "445",
     ):
         """
         :param oks_sigma:                 OKS sigmas for pose estimation. Array of [Num Keypoints].
@@ -277,9 +278,8 @@ class YoloHeadsLoss(nn.Module):
         self.iou_loss_weight = iou_loss_weight
 
         self.iou_loss = {"giou": GIoULoss, "ciou": CIoULoss}[regression_iou_loss_type]()
-        self.num_keypoints = num_joints
         self.num_classes = 1  # We have only one class in pose estimation task
-        self.oks_sigmas = torch.tensor([oks_sigma] * num_joints)
+        self.oks_sigmas = torch.tensor([oks_sigma]).view(1, 1)
         self.pose_reg_loss_weight = pose_reg_loss_weight
         self.flame = FLAMELayer(FLAME_CONSTS)
         self.indexes_subset = get_445_keypoints_indexes()
@@ -292,6 +292,19 @@ class YoloHeadsLoss(nn.Module):
         self.pose_classification_loss_type = pose_classification_loss_type
         self.rescale_pose_loss_with_assigned_score = rescale_pose_loss_with_assigned_score
         self.average_losses_in_ddp = average_losses_in_ddp
+
+        if isinstance(indexes_subset, str) and indexes_subset == "445":
+            self.indexes_subset = get_445_keypoints_indexes()
+        elif isinstance(indexes_subset, float):
+            if indexes_subset <= 0 or indexes_subset > 1:
+                raise ValueError("indexes_subset must be in range [0, 1]")
+            self.indexes_subset = None
+            self.random_indexes_fraction = indexes_subset
+        elif indexes_subset is None:
+            self.indexes_subset = None
+            self.random_indexes_fraction = None
+        else:
+            raise ValueError("indexes_subset must be either '445', float (0, 1] or None")
 
     @torch.no_grad()
     def _unpack_flat_targets(self, targets: Tuple[Tensor, Tensor, Tensor], batch_size: int) -> Mapping[str, torch.Tensor]:
@@ -542,11 +555,25 @@ class YoloHeadsLoss(nn.Module):
 
             # Do not divide poses by stride since this would skew the loss and make sigmas incorrect
             pred_flame_params = pred_flame_params[mask_positive]
-            pred_pose_coords = reproject_spatial_vertices(self.flame, pred_flame_params, to_2d=True, subset_indexes=self.indexes_subset)
-
+            pred_pose_coords = reproject_spatial_vertices(self.flame, pred_flame_params, to_2d=True)
             gt_pose_coords = assign_result.assigned_poses[..., 0:2][mask_positive]
 
             area = self._xyxy_box_area(assigned_bboxes_pos_image_coord).reshape([-1, 1]) * 0.53
+
+            num_keypoins = pred_pose_coords.size(-2)
+
+            if self.indexes_subset is not None:
+                pred_pose_coords = pred_pose_coords[:, self.indexes_subset, :]
+                gt_pose_coords = gt_pose_coords[:, self.indexes_subset, :]
+            elif self.random_indexes_fraction is not None:
+                # Randomly sample keypoints
+                int(random.random() * num_keypoins)
+                indices = list(random.sample(range(num_keypoins), k=int(num_keypoins * self.random_indexes_fraction)))
+                subset = torch.tensor(indices, dtype=torch.long, device=pred_pose_coords.device)
+                pred_pose_coords = pred_pose_coords[:, subset, :]
+                gt_pose_coords = gt_pose_coords[:, subset, :]
+
+            # , subset_indexes=self.indexes_subset
             loss_pose_reg = self._keypoint_loss(
                 predicted_coords=pred_pose_coords,
                 target_coords=gt_pose_coords,

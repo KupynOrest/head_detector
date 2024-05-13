@@ -31,11 +31,11 @@ dataset_params:
 
   train_dataloader_params:
     persistent_workers: True
-    batch_size: 24
+    batch_size: 8
 
   val_dataloader_params:
     persistent_workers: True
-    batch_size: 24
+    batch_size: 8
 
 
 hydra:

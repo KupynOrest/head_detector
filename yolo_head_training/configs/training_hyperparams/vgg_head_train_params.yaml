@@ -22,7 +22,7 @@ loss: YoloHeadsLoss
 
 criterion_params:
   oks_sigma: ${dataset_params.oks_sigma}
-  num_joints: ${dataset_params.num_joints}
+  #num_joints: ${dataset_params.num_joints}
   classification_loss_weight: 1.0
   classification_loss_type: focal
   regression_iou_loss_type: ciou
@@ -32,6 +32,7 @@ criterion_params:
   pose_classification_loss_type: focal
   rescale_pose_loss_with_assigned_score: False
   assigner_multiply_by_pose_oks: False
+  indexes_subset: 0.5
 
 optimizer: AdamW
 optimizer_params:
