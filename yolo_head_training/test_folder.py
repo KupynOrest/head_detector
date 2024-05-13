@@ -1,4 +1,6 @@
+import os
 import math
+import glob
 from pathlib import Path
 from typing import Union, Optional
 
@@ -52,26 +54,20 @@ def predict_on_image(model, image, dsize=640):
 
     # Resize image to dsize x dsize but keep the aspect ratio by padding with zeros
     original_shape = image.shape[:2]
-    scale_w, scale_h = dsize / original_shape[1], dsize / original_shape[0]
-    if scale_w > scale_h:
-        new_shape = (dsize, int(original_shape[0] * scale_w))
-        scale = scale_w
-    else:
-        new_shape = (int(original_shape[1] * scale_h), dsize)
-        scale = scale_h
-
+    #resize to dsize max side
+    scale = dsize / max(original_shape)
+    new_shape = (int(original_shape[1] * scale), int(original_shape[0] * scale))
     image = cv2.resize(image, new_shape)
 
     # Pad the image with zeros
     # For simplicity, we do bottom and right padding to simply the calculations in post-processing
-    pad_w = dsize - new_shape[1]
-    pad_h = dsize - new_shape[0]
+    pad_w = dsize - image.shape[1]
+    pad_h = dsize - image.shape[0]
     image = cv2.copyMakeBorder(image, 0, pad_h, 0, pad_w, cv2.BORDER_CONSTANT, value=127)
 
     image_input = torch.from_numpy(image).to(device).permute(2, 0, 1).unsqueeze(0).float() / 255.0
-
     raw_predictions = model(image_input)
-    (predictions,) = model.get_post_prediction_callback(conf=0.1, iou=0.5, post_nms_max_predictions=1)(raw_predictions)
+    (predictions,) = model.get_post_prediction_callback(conf=0.5, iou=0.5, post_nms_max_predictions=30)(raw_predictions)
 
     predictions: YoloHeadsPredictions = predictions
     predictions.predicted_2d_vertices /= scale # There are 565 keypoints subset here
@@ -80,6 +76,13 @@ def predict_on_image(model, image, dsize=640):
     flame = FlameParams.from_3dmm(predictions.mm_params, FLAME_CONSTS)
     flame.scale /= scale
     predictions.mm_params = flame.to_3dmm_tensor()
+    params = predictions.mm_params.numpy().tolist()
+    for i, head in enumerate(params):
+        head = head[400:406]
+        pred_pose = calculate_rpy(predictions.mm_params[i][400:406])
+        print(f"Roll {pred_pose.roll:.2f}, Pitch {pred_pose.pitch:.2f}, Yaw {pred_pose.yaw:.2f}")
+        print(["{0:0.2f}".format(i) for i in head])
+    print("============================")
 
     return predictions, flame
 
@@ -100,7 +103,7 @@ def limit_angle(angle: Union[int, float], pi: Union[int, float] = 180.0) -> Unio
 
 
 def calculate_rpy(flame_params) -> RPY:
-    rot_mat = rot_mat_from_6dof(flame_params.rotation).numpy()[0]
+    rot_mat = rot_mat_from_6dof(flame_params).numpy()[0]
     rot_mat_2 = np.transpose(rot_mat)
     angle = Rotation.from_matrix(rot_mat_2).as_euler("xyz", degrees=True)
     roll, pitch, yaw = list(map(limit_angle, [angle[2], angle[0] - 180, angle[1]]))
@@ -130,47 +133,19 @@ def draw_pose(rpy: RPY, image: np.ndarray) -> np.ndarray:
     return image
 
 
-def main(model_name="YoloHeads_M", checkpoint="C:/Develop/GitHub/VGG/head_detector/yolo_head_training/weights/ckpt_best.pth", dataset_dir="g:/AFLW2000"):
-    images, labels = find_images_and_labels(dataset_dir)
+def main(folder: str, model_name="YoloHeads_M", checkpoint="C:/Develop/GitHub/VGG/head_detector/yolo_head_training/weights/ckpt_best.pth"):
+    images = glob.glob(f"{folder}/*")
+    os.makedirs("test", exist_ok=True)
     model = models.get(model_name, checkpoint_path=checkpoint, num_classes=413).eval() # 412 is total number of flame params
-    metrics = {
-        "roll": [],
-        "pitch": [],
-        "yaw": [],
-    }
     index = 0
-    for image_path, gt in tqdm.tqdm(zip(images, labels)):
-        try:
-            image = cv2.imread(str(image_path))
-            gt_image = image.copy()
-            # image = cv2.resize(image, (640, 640))
-            predictions, flame_params = predict_on_image(model, image)
-            pred_pose = calculate_rpy(flame_params)
-            gt_pose = get_ground_truth(str(gt))
-            if gt_pose is None:
-                continue
-            roll_mae = mae(gt_pose.roll, pred_pose.roll)
-            pitch_mae = mae(gt_pose.pitch, pred_pose.pitch)
-            yaw_mae = mae(gt_pose.yaw, pred_pose.yaw)
-            if roll_mae > MAE_THRESHOLD or pitch_mae > MAE_THRESHOLD or yaw_mae > MAE_THRESHOLD:
-                image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-                image = draw_2d_keypoints(image[..., ::-1], predictions.predicted_2d_vertices.reshape(-1, 2))
-                image = draw_pose(pred_pose, image)
-                gt_image = draw_pose(gt_pose, gt_image)
-                cv2.imwrite(f"output/{index}.jpg", np.hstack((image, gt_image)))
-                index += 1
-            else:
-                metrics["roll"].append(mae(gt_pose.roll, pred_pose.roll))
-                metrics["pitch"].append(mae(gt_pose.pitch, pred_pose.pitch))
-                metrics["yaw"].append(mae(gt_pose.yaw, pred_pose.yaw))
-        except Exception as e:
-            print(f"Failed to process image {image_path}: {e}")
-
-    roll_mae = np.mean(np.array(metrics["roll"]))
-    pitch_mae = np.mean(np.array(metrics["pitch"]))
-    yaw_mae = np.mean(np.array(metrics["yaw"]))
-    print(f"Roll MAE: {roll_mae}, Pitch MAE: {pitch_mae}, Yaw MAE: {yaw_mae}, MAE = {(roll_mae + pitch_mae + yaw_mae) / 3}")
-    print(f"Fail Cases: {index}")
+    for image_path in tqdm.tqdm(images):
+        print(image_path)
+        image = cv2.imread(str(image_path))
+        predictions, flame_params = predict_on_image(model, image)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        image = draw_2d_keypoints(image[..., ::-1], predictions.predicted_2d_vertices.reshape(-1, 2))
+        cv2.imwrite(f"test/{index}.jpg", image)
+        index += 1
 
 
 if __name__ == "__main__":
