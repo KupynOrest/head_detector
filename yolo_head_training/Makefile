@@ -54,33 +54,33 @@ yolo_heads_m_large_medium_albu_augs_eugene:
 yolo_heads_m_small_eugene_grid_search:
 	python train.py --config-name=yolo_heads_m_small_eugene \
     training_hyperparams.criterion_params.indexes_subset=0.5 experiment_suffix='sparse_05' \
-    dataset_params.train_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/large \
-    dataset_params.val_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/large \
+    dataset_params.train_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/small \
+    dataset_params.val_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/small \
     num_gpus=4 multi_gpu=DDP
 	python train.py --config-name=yolo_heads_m_small_eugene \
     training_hyperparams.criterion_params.indexes_subset=0.4 experiment_suffix='sparse_04' \
-    dataset_params.train_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/large \
-    dataset_params.val_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/large \
+    dataset_params.train_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/small \
+    dataset_params.val_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/small \
     num_gpus=4 multi_gpu=DDP
 	python train.py --config-name=yolo_heads_m_small_eugene \
     training_hyperparams.criterion_params.indexes_subset=0.3 experiment_suffix='sparse_03' \
-    dataset_params.train_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/large \
-    dataset_params.val_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/large \
+    dataset_params.train_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/small \
+    dataset_params.val_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/small \
     num_gpus=4 multi_gpu=DDP
 	python train.py --config-name=yolo_heads_m_small_eugene \
     training_hyperparams.criterion_params.indexes_subset=0.2 experiment_suffix='sparse_02' \
-    dataset_params.train_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/large \
-    dataset_params.val_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/large \
+    dataset_params.train_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/small \
+    dataset_params.val_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/small \
     num_gpus=4 multi_gpu=DDP
 	python train.py --config-name=yolo_heads_m_small_eugene \
     training_hyperparams.criterion_params.indexes_subset=0.1 experiment_suffix='sparse_01' \
-    dataset_params.train_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/large \
-    dataset_params.val_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/large \
+    dataset_params.train_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/small \
+    dataset_params.val_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/small \
     num_gpus=4 multi_gpu=DDP
 	python train.py --config-name=yolo_heads_m_small_eugene \
     training_hyperparams.criterion_params.indexes_subset='445' experiment_suffix='sparse_default' \
-    dataset_params.train_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/large \
-    dataset_params.val_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/large \
+    dataset_params.train_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/small \
+    dataset_params.val_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/small \
     num_gpus=4 multi_gpu=DDP
 
 
