@@ -78,8 +78,10 @@ class DataGenerator:
                 if self.caption_processor.contains_person(caption):
                     continue
                 caption = self.caption_processor.add_ethnic_labels(caption)
-                if random.random() < 0.7:
-                    caption = f"{caption}, ultra highres, hyper realistic and highly detailed, detailed face, sharp eyes, realistic skin texture"
+                if random.random() < 0.5:
+                    caption = f"{caption}, ultra highres, head looking up"
+                else:
+                    caption = f"{caption}, ultra highres, head looking down"
                 image = self.pipeline(
                     caption,
                     negative_prompt=NEGATIVE_PROMPT,
@@ -93,6 +95,7 @@ class DataGenerator:
                     continue
                 print(f"Saving to {os.path.join(save_dir, folder_name, 'images', f'{filename}.jpg')}")
                 image.save(os.path.join(save_dir, folder_name, "images", f"{filename}.jpg"))
+                image.save(os.path.join("/work/okupyn/pitch_test", f"{filename}.jpg"))
             except Exception as e:
                 print(f"Error: {e}")
                 pass
