@@ -9,7 +9,7 @@ from super_gradients.training.samples import PoseEstimationSample
 from torch import Tensor
 from torchmetrics import Metric
 
-from yolo_head.flame import FLAMELayer, FLAME_CONSTS
+from yolo_head.flame import FLAMELayer, FLAME_CONSTS, get_445_keypoints_indexes
 from .functional import metrics_w_bbox_wrapper, match_head_boxes
 from .. import YoloHeadsPostPredictionCallback
 from ..yolo_heads_predictions import YoloHeadsPredictions
@@ -56,6 +56,7 @@ class KeypointsNME(Metric):
         self.add_state("nme", default=torch.tensor(0.0), dist_reduce_fx="sum")
         self.add_state("total", default=torch.tensor(0.0), dist_reduce_fx="sum")
         self.add_state("total_tp", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.indexes_subset = get_445_keypoints_indexes()
 
     def update(
         self,
@@ -94,9 +95,9 @@ class KeypointsNME(Metric):
             for pred_index, true_index in match_result.tp_matches:
                 self.nme += metrics_w_bbox_wrapper(
                     function=keypoints_nme,
-                    outputs=pred_vertices_2d[pred_index][..., 0:2],
+                    outputs=pred_vertices_2d[pred_index][..., self.indexes_subset, 0:2],
                     gts={
-                        "keypoints": true_keypoints[true_index][..., 0:2],
+                        "keypoints": true_keypoints[true_index][..., self.indexes_subset, 0:2],
                         "bboxes": gt_samples[image_index].bboxes_xywh[true_index],
                     },
                 )

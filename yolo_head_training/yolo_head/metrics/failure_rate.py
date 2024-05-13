@@ -11,6 +11,7 @@ from torchmetrics import Metric
 from yolo_head.yolo_heads_post_prediction_callback import YoloHeadsPostPredictionCallback
 from yolo_head.yolo_heads_predictions import YoloHeadsPredictions
 from .functional import metrics_w_bbox_wrapper, match_head_boxes
+from ..flame import get_445_keypoints_indexes
 
 
 def percentage_of_errors_below_IOD(
@@ -52,6 +53,7 @@ class KeypointsFailureRate(Metric):
         self.add_state("failure_rate", default=torch.tensor(0.0), dist_reduce_fx="sum")
         self.add_state("total", default=torch.tensor(0.0), dist_reduce_fx="sum")
         self.add_state("total_tp", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.indexes_subset = get_445_keypoints_indexes()
 
     def update(
         self,
@@ -90,9 +92,9 @@ class KeypointsFailureRate(Metric):
             for pred_index, true_index in match_result.tp_matches:
                 self.failure_rate += metrics_w_bbox_wrapper(
                     function=percentage_of_errors_below_IOD,
-                    outputs=pred_vertices_2d[pred_index],
+                    outputs=pred_vertices_2d[pred_index][..., self.indexes_subset, 0:2],
                     gts={
-                        "keypoints": true_keypoints[true_index][..., 0:2],
+                        "keypoints": true_keypoints[true_index][..., self.indexes_subset, 0:2],
                         "bboxes": gt_samples[image_index].bboxes_xywh[true_index],
                     },
                     threshold=self.threshold,

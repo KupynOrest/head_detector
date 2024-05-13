@@ -3,7 +3,6 @@ from typing import List, Tuple
 import torch
 import torchvision
 from super_gradients.module_interfaces import AbstractPoseEstimationPostPredictionCallback
-from torch import Tensor
 
 from .flame import FLAMELayer, FLAME_CONSTS, reproject_spatial_vertices, get_445_keypoints_indexes
 from .yolo_head_ndfl_heads import YoloHeadsDecodedPredictions, YoloHeadsRawOutputs
@@ -38,7 +37,6 @@ class YoloHeadsPostPredictionCallback(AbstractPoseEstimationPostPredictionCallba
         self.pre_nms_max_predictions = pre_nms_max_predictions
         self.post_nms_max_predictions = post_nms_max_predictions
         self.flame = FLAMELayer(FLAME_CONSTS)
-        self.indexes_subset = get_445_keypoints_indexes()
 
     @torch.no_grad()
     def __call__(self, outputs: Tuple[YoloHeadsDecodedPredictions, YoloHeadsRawOutputs]) -> List[YoloHeadsPredictions]:
@@ -85,7 +83,7 @@ class YoloHeadsPostPredictionCallback(AbstractPoseEstimationPostPredictionCallba
             final_scores = pred_bboxes_conf[idx_to_keep][: self.post_nms_max_predictions]  # [Instances, 1]
             final_params = pred_flame_params[idx_to_keep][: self.post_nms_max_predictions]  # [Instances, Flame Params]
 
-            final_3d_pts = reproject_spatial_vertices(flame_layer, final_params, to_2d=True, subset_indexes=self.indexes_subset)
+            final_3d_pts = reproject_spatial_vertices(flame_layer, final_params, to_2d=True)
             final_2d_pts = final_3d_pts[..., :2]
 
             p = YoloHeadsPredictions(
