@@ -91,17 +91,17 @@ class KeypointsFailureRate(Metric):
             )
 
             for pred_index, true_index in match_result.tp_matches:
-                pred_keypoints = pred_vertices_2d[pred_index][..., 0:2]
-                true_keypoints = true_keypoints[true_index][..., 0:2]
+                pred_keypoints_i = pred_vertices_2d[pred_index][..., 0:2]
+                true_keypoints_i = true_keypoints[true_index][..., 0:2]
                 if self.indexes_subset is not None:
-                    pred_keypoints = pred_keypoints[self.indexes_subset, :]
-                    true_keypoints = true_keypoints[self.indexes_subset, :]
+                    pred_keypoints_i = pred_keypoints_i[self.indexes_subset, :]
+                    true_keypoints_i = true_keypoints_i[self.indexes_subset, :]
 
                 self.failure_rate += metrics_w_bbox_wrapper(
                     function=percentage_of_errors_below_IOD,
-                    outputs=pred_keypoints,
+                    outputs=pred_keypoints_i,
                     gts={
-                        "keypoints": true_keypoints,
+                        "keypoints": true_keypoints_i,
                         "bboxes": gt_samples[image_index].bboxes_xywh[true_index],
                     },
                     threshold=self.threshold,
