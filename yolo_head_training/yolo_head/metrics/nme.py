@@ -96,8 +96,8 @@ class KeypointsNME(Metric):
                 pred_keypoints = pred_vertices_2d[pred_index][..., 0:2]
                 true_keypoints = true_keypoints[true_index][..., 0:2]
                 if self.indexes_subset is not None:
-                    pred_keypoints = pred_keypoints[..., self.indexes_subset, :]
-                    true_keypoints = true_keypoints[..., self.indexes_subset, :]
+                    pred_keypoints = pred_keypoints[self.indexes_subset, :]
+                    true_keypoints = true_keypoints[self.indexes_subset, :]
 
                 self.nme += metrics_w_bbox_wrapper(
                     function=keypoints_nme,
