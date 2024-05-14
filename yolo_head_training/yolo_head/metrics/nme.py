@@ -1,17 +1,16 @@
-from typing import Any, List
+from typing import Any, List, Union
 
 import torch
 import torch.nn
 from super_gradients.common.registry import register_metric
-from super_gradients.module_interfaces import AbstractPoseEstimationPostPredictionCallback
 from super_gradients.training.datasets.data_formats.bbox_formats.xywh import xywh_to_xyxy
 from super_gradients.training.samples import PoseEstimationSample
 from torch import Tensor
 from torchmetrics import Metric
 
-from yolo_head.flame import FLAMELayer, FLAME_CONSTS, get_445_keypoints_indexes
 from .functional import metrics_w_bbox_wrapper, match_head_boxes
-from .. import YoloHeadsPostPredictionCallback
+from ..yolo_heads_post_prediction_callback import YoloHeadsPostPredictionCallback
+from ..flame import get_indices
 from ..yolo_heads_predictions import YoloHeadsPredictions
 
 
@@ -41,6 +40,7 @@ class KeypointsNME(Metric):
 
     def __init__(
         self,
+        indexes_subset: Union[str, None],
         post_prediction_callback: YoloHeadsPostPredictionCallback,
         min_iou: float = 0.5,
         weight: int = 100,
@@ -56,7 +56,7 @@ class KeypointsNME(Metric):
         self.add_state("nme", default=torch.tensor(0.0), dist_reduce_fx="sum")
         self.add_state("total", default=torch.tensor(0.0), dist_reduce_fx="sum")
         self.add_state("total_tp", default=torch.tensor(0.0), dist_reduce_fx="sum")
-        self.indexes_subset = get_445_keypoints_indexes()
+        self.indexes_subset = torch.tensor(get_indices()[indexes_subset]).long() if indexes_subset is not None else None
 
     def update(
         self,
@@ -93,11 +93,17 @@ class KeypointsNME(Metric):
             )
 
             for pred_index, true_index in match_result.tp_matches:
+                pred_keypoints = pred_vertices_2d[pred_index][..., 0:2]
+                true_keypoints = true_keypoints[true_index][..., 0:2]
+                if self.indexes_subset is not None:
+                    pred_keypoints = pred_keypoints[..., self.indexes_subset, :]
+                    true_keypoints = true_keypoints[..., self.indexes_subset, :]
+
                 self.nme += metrics_w_bbox_wrapper(
                     function=keypoints_nme,
-                    outputs=pred_vertices_2d[pred_index][..., self.indexes_subset, 0:2],
+                    outputs=pred_keypoints,
                     gts={
-                        "keypoints": true_keypoints[true_index][..., self.indexes_subset, 0:2],
+                        "keypoints": true_keypoints,
                         "bboxes": gt_samples[image_index].bboxes_xywh[true_index],
                     },
                 )

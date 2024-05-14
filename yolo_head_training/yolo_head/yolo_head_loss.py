@@ -13,7 +13,7 @@ from super_gradients.training.losses.yolo_nas_pose_loss import CIoULoss
 from super_gradients.training.utils.bbox_utils import batch_distance2bbox
 from torch import nn, Tensor
 
-from .flame import FLAMELayer, FLAME_CONSTS, FlameParams, reproject_spatial_vertices, get_445_keypoints_indexes
+from .flame import FLAMELayer, FLAME_CONSTS, FlameParams, reproject_spatial_vertices, get_445_keypoints_indexes, get_indices
 from .yolo_head_ndfl_heads import YoloHeadsRawOutputs, YoloHeadsDecodedPredictions
 
 
@@ -243,6 +243,7 @@ class YoloHeadsLoss(nn.Module):
     def __init__(
         self,
         oks_sigma: float,
+        indexes_subset: Union[None, float, str],
         classification_loss_type: str = "focal",
         regression_iou_loss_type: str = "ciou",
         classification_loss_weight: float = 1.0,
@@ -256,7 +257,6 @@ class YoloHeadsLoss(nn.Module):
         assigner_multiply_by_pose_oks: bool = False,
         rescale_pose_loss_with_assigned_score: bool = False,
         average_losses_in_ddp: bool = False,
-        indexes_subset: Union[None, float, str] = "445",
     ):
         """
         :param oks_sigma:                 OKS sigmas for pose estimation. Array of [Num Keypoints].
@@ -282,7 +282,6 @@ class YoloHeadsLoss(nn.Module):
         self.oks_sigmas = torch.tensor([oks_sigma]).view(1, 1)
         self.pose_reg_loss_weight = pose_reg_loss_weight
         self.flame = FLAMELayer(FLAME_CONSTS)
-        self.indexes_subset = get_445_keypoints_indexes()
 
         self.assigner = YoloHeadsTaskAlignedAssigner(
             topk=bbox_assigner_topk,
@@ -293,8 +292,8 @@ class YoloHeadsLoss(nn.Module):
         self.rescale_pose_loss_with_assigned_score = rescale_pose_loss_with_assigned_score
         self.average_losses_in_ddp = average_losses_in_ddp
 
-        if isinstance(indexes_subset, str) and indexes_subset == "445":
-            self.indexes_subset = get_445_keypoints_indexes()
+        if isinstance(indexes_subset, str):
+            self.indexes_subset = torch.tensor(get_indices()[indexes_subset]).long()
         elif isinstance(indexes_subset, float):
             if indexes_subset <= 0 or indexes_subset > 1:
                 raise ValueError("indexes_subset must be in range [0, 1]")
@@ -304,7 +303,7 @@ class YoloHeadsLoss(nn.Module):
             self.indexes_subset = None
             self.random_indexes_fraction = None
         else:
-            raise ValueError("indexes_subset must be either '445', float (0, 1] or None")
+            raise ValueError("indexes_subset must be either string, float (0, 1] or None")
 
     @torch.no_grad()
     def _unpack_flat_targets(self, targets: Tuple[Tensor, Tensor, Tensor], batch_size: int) -> Mapping[str, torch.Tensor]:

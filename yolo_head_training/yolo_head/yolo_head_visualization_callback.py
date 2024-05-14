@@ -2,7 +2,6 @@ from typing import Optional, Union, List, Tuple
 
 import numpy as np
 import torch
-from omegaconf import ListConfig
 from super_gradients.common.registry import register_callback
 from super_gradients.training.datasets.data_formats.bbox_formats.xywh import xywh_to_xyxy
 from super_gradients.training.samples import PoseEstimationSample
@@ -11,8 +10,9 @@ from super_gradients.training.utils.visualization.pose_estimation import PoseVis
 from torch import Tensor
 from torchmetrics import Metric
 
-from yolo_head import YoloHeadsPostPredictionCallback
-from yolo_head.yolo_heads_predictions import YoloHeadsPredictions
+from .yolo_heads_post_prediction_callback import YoloHeadsPostPredictionCallback
+from .flame import get_indices
+from .yolo_heads_predictions import YoloHeadsPredictions
 
 
 @register_callback()
@@ -20,6 +20,7 @@ class ExtremeBatchYoloHeadsVisualizationCallback(ExtremeBatchCaseVisualizationCa
 
     def __init__(
         self,
+        indexes_subset: Union[None, float, str],
         post_prediction_callback: YoloHeadsPostPredictionCallback,
         metric: Optional[Metric] = None,
         metric_component_name: Optional[str] = None,
@@ -43,6 +44,7 @@ class ExtremeBatchYoloHeadsVisualizationCallback(ExtremeBatchCaseVisualizationCa
         self.post_prediction_callback = post_prediction_callback
         self.keypoints_color = tuple(keypoints_color)
         self.max_images = max_images
+        self.indexes_subset = torch.tensor(get_indices()[indexes_subset]).long() if indexes_subset is not None else None
 
     @classmethod
     def universal_undo_preprocessing_fn(cls, inputs: torch.Tensor) -> np.ndarray:
@@ -60,9 +62,8 @@ class ExtremeBatchYoloHeadsVisualizationCallback(ExtremeBatchCaseVisualizationCa
         inputs = np.ascontiguousarray(inputs, dtype=np.uint8)
         return inputs
 
-    @classmethod
     def _visualize_batch(
-        cls,
+        self,
         image_tensor: np.ndarray,
         keypoints: List[Union[np.ndarray, Tensor]],
         bboxes: List[Union[None, np.ndarray, Tensor]],
@@ -89,6 +90,9 @@ class ExtremeBatchYoloHeadsVisualizationCallback(ExtremeBatchCaseVisualizationCa
             bboxes_i = bboxes[i]
             scores_i = scores[i] if scores is not None else None
             is_crowd_i = is_crowd[i] if is_crowd is not None else None
+
+            if self.indexes_subset is not None:
+                keypoints_i = keypoints_i[..., self.indexes_subset, :]
 
             if torch.is_tensor(keypoints_i):
                 keypoints_i = keypoints_i.detach().cpu().numpy()
