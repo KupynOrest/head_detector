@@ -2,7 +2,6 @@ import dataclasses
 import random
 from typing import Mapping, Tuple, Optional, Union
 
-import einops
 import torch
 import torch.nn.functional as F
 from super_gradients.common.environment.ddp_utils import get_world_size, is_distributed
@@ -13,8 +12,9 @@ from super_gradients.training.losses.yolo_nas_pose_loss import CIoULoss
 from super_gradients.training.utils.bbox_utils import batch_distance2bbox
 from torch import nn, Tensor
 
-from .flame import FLAMELayer, FLAME_CONSTS, FlameParams, reproject_spatial_vertices, get_445_keypoints_indexes, get_indices
+from .flame import FLAMELayer, FLAME_CONSTS, reproject_spatial_vertices, get_indices
 from .yolo_head_ndfl_heads import YoloHeadsRawOutputs, YoloHeadsDecodedPredictions
+from .losses import Vertices3DLoss, FrobeniusNormLoss, GeodesicLoss, CosineRotationLoss
 
 
 @dataclasses.dataclass
@@ -30,15 +30,15 @@ class YoloHeadsAssignmentResult:
     :param assigned_scores: Tensor of shape (B, L, C) - Assigned scores for each anchor location
     :param assigned_poses: Tensor of shape (B, L, 17, 3) - Assigned groundtruth poses for each anchor location
     :param assigned_gt_index: Tensor of shape (B, L) - Index of assigned groundtruth box for each anchor location
-    :param assigned_crowd: Tensor of shape (B, L) - Whether the assigned groundtruth box is crowd
     """
 
     assigned_labels: Tensor
     assigned_bboxes: Tensor
     assigned_poses: Tensor
+    assigned_vertices: Tensor
+    assigned_rotations: Tensor
     assigned_scores: Tensor
     assigned_gt_index: Tensor
-    assigned_crowd: Tensor
 
 
 def batch_pose_oks(gt_keypoints: torch.Tensor, pred_keypoints: torch.Tensor, gt_bboxes_xyxy: torch.Tensor, sigmas: torch.Tensor, eps: float = 1e-9) -> float:
@@ -106,7 +106,8 @@ class YoloHeadsTaskAlignedAssigner(nn.Module):
         gt_labels: Tensor,
         gt_bboxes: Tensor,
         gt_poses: Tensor,
-        gt_crowd: Tensor,
+        gt_vertices: Tensor,
+        gt_rotations: Tensor,
         pad_gt_mask: Tensor,
         bg_index: int,
     ) -> YoloHeadsAssignmentResult:
@@ -128,7 +129,6 @@ class YoloHeadsTaskAlignedAssigner(nn.Module):
         :param gt_labels: Tensor (int64|int32): Label of gt_bboxes, shape(B, n, 1)
         :param gt_bboxes: Tensor (float32): Ground truth bboxes, shape(B, n, 4)
         :param gt_poses: Tensor (float32): Ground truth poses, shape(B, n, Num Keypoints, 3)
-        :param gt_crowd: Tensor (int): Whether the gt is crowd, shape(B, n, 1)
         :param pad_gt_mask: Tensor (float32): 1 means bbox, 0 means no bbox, shape(B, n, 1)
         :param bg_index: int ( background index
         :param gt_scores: Tensor (one, float32) Score of gt_bboxes, shape(B, n, 1)
@@ -149,9 +149,10 @@ class YoloHeadsTaskAlignedAssigner(nn.Module):
             assigned_labels = torch.full([batch_size, num_anchors], bg_index, dtype=torch.long, device=gt_labels.device)
             assigned_bboxes = torch.zeros([batch_size, num_anchors, 4], device=gt_labels.device)
             assigned_poses = torch.zeros([batch_size, num_anchors, num_keypoints, 3], device=gt_labels.device)
+            assigned_vertices = torch.zeros([batch_size, num_anchors, num_keypoints, 3], device=gt_labels.device)
+            assigned_rotations = torch.zeros([batch_size, num_anchors, 3, 3], device=gt_labels.device)
             assigned_scores = torch.zeros([batch_size, num_anchors, num_classes], device=gt_labels.device)
             assigned_gt_index = torch.zeros([batch_size, num_anchors], dtype=torch.long, device=gt_labels.device)
-            assigned_crowd = torch.zeros([batch_size, num_anchors], dtype=torch.bool, device=gt_labels.device)
 
             return YoloHeadsAssignmentResult(
                 assigned_labels=assigned_labels,
@@ -159,7 +160,8 @@ class YoloHeadsTaskAlignedAssigner(nn.Module):
                 assigned_scores=assigned_scores,
                 assigned_gt_index=assigned_gt_index,
                 assigned_poses=assigned_poses,
-                assigned_crowd=assigned_crowd,
+                assigned_vertices=assigned_vertices,
+                assigned_rotations=assigned_rotations,
             )
 
         # compute iou between gt and pred bbox, [B, n, L]
@@ -207,6 +209,12 @@ class YoloHeadsTaskAlignedAssigner(nn.Module):
         assigned_poses = gt_poses.reshape([-1, num_keypoints, 3])[assigned_gt_index.flatten(), :]
         assigned_poses = assigned_poses.reshape([batch_size, num_anchors, num_keypoints, 3])
 
+        assigned_vertices = gt_vertices.reshape([-1, num_keypoints, 3])[assigned_gt_index.flatten(), :]
+        assigned_vertices = assigned_vertices.reshape([batch_size, num_anchors, num_keypoints, 3])
+
+        assigned_rotations = gt_rotations.reshape([-1, 3, 3])[assigned_gt_index.flatten(), :]
+        assigned_rotations = assigned_rotations.reshape([batch_size, num_anchors, 3, 3])
+
         assigned_scores = torch.nn.functional.one_hot(assigned_labels, num_classes + 1)
         ind = list(range(num_classes + 1))
         ind.remove(bg_index)
@@ -219,18 +227,14 @@ class YoloHeadsTaskAlignedAssigner(nn.Module):
         alignment_metrics = alignment_metrics.max(dim=-2).values.unsqueeze(-1)
         assigned_scores = assigned_scores * alignment_metrics
 
-        # respect crowd
-        assigned_crowd = torch.gather(gt_crowd.flatten(), index=assigned_gt_index.flatten(), dim=0)
-        assigned_crowd = assigned_crowd.reshape([batch_size, num_anchors])
-        assigned_scores = assigned_scores * assigned_crowd.eq(0).unsqueeze(-1)
-
         return YoloHeadsAssignmentResult(
             assigned_labels=assigned_labels,
             assigned_bboxes=assigned_bboxes,
             assigned_scores=assigned_scores,
             assigned_poses=assigned_poses,
             assigned_gt_index=assigned_gt_index,
-            assigned_crowd=assigned_crowd,
+            assigned_vertices=assigned_vertices,
+            assigned_rotations=assigned_rotations,
         )
 
 
@@ -246,6 +250,8 @@ class YoloHeadsLoss(nn.Module):
         indexes_subset: Union[None, float, str],
         classification_loss_type: str = "focal",
         regression_iou_loss_type: str = "ciou",
+        vertices_loss: str = "smooth_l1",
+        rotation_loss: str = "geodesic",
         classification_loss_weight: float = 1.0,
         iou_loss_weight: float = 2.5,
         dfl_loss_weight: float = 0.5,
@@ -254,7 +260,6 @@ class YoloHeadsLoss(nn.Module):
         bbox_assigner_topk: int = 13,
         bbox_assigned_alpha: float = 1.0,
         bbox_assigned_beta: float = 6.0,
-        assigner_multiply_by_pose_oks: bool = False,
         rescale_pose_loss_with_assigned_score: bool = False,
         average_losses_in_ddp: bool = False,
     ):
@@ -278,6 +283,8 @@ class YoloHeadsLoss(nn.Module):
         self.iou_loss_weight = iou_loss_weight
 
         self.iou_loss = {"giou": GIoULoss, "ciou": CIoULoss}[regression_iou_loss_type]()
+        self.vertices_loss = Vertices3DLoss(criterion=vertices_loss)
+        self.rotation_loss = {"frobenius": FrobeniusNormLoss, "geodesic": GeodesicLoss, "cosine": CosineRotationLoss}[rotation_loss]()
         self.num_classes = 1  # We have only one class in pose estimation task
         self.oks_sigmas = torch.tensor([oks_sigma]).view(1, 1)
         self.pose_reg_loss_weight = pose_reg_loss_weight
@@ -306,21 +313,22 @@ class YoloHeadsLoss(nn.Module):
             raise ValueError("indexes_subset must be either string, float (0, 1] or None")
 
     @torch.no_grad()
-    def _unpack_flat_targets(self, targets: Tuple[Tensor, Tensor, Tensor], batch_size: int) -> Mapping[str, torch.Tensor]:
+    def _unpack_flat_targets(self, targets: Tuple[Tensor, Tensor, Tensor, Tensor], batch_size: int) -> Mapping[str, torch.Tensor]:
         """
         Convert targets to PPYoloE-compatible format since it's the easiest (not the cleanest) way to
         have PP Yolo training & metrics computed
 
-        :param targets: Tuple (boxes, joints, crowd)
+        :param targets: Tuple (boxes, joints, vertices, rotations)
                         - boxes: [N, 5] (batch_index, x1, y1, x2, y2)
                         - joints: [N, num_joints, 4] (batch_index, x, y, visibility)
-                        - crowd: [N, 2] (batch_index, is_crowd)
+                        - vertices: [N, num_vertices, 4] (batch_index, x, y, z)
+                        - rotations: [N, 3, 4] (rotations matrices)
         :return:        (Dictionary [str,Tensor]) with keys:
                         - gt_class: (Tensor, int64|int32): Label of gt_bboxes, shape(B, n, 1)
                         - gt_bbox: (Tensor, float32): Ground truth bboxes, shape(B, n, 4) in XYXY format
                         - pad_gt_mask (Tensor, float32): 1 means bbox, 0 means no bbox, shape(B, n, 1)
         """
-        target_boxes, target_joints, target_iscrowd = targets
+        target_boxes, target_joints, target_vertices, target_rotations = targets
 
         image_index = target_boxes[:, 0]
         gt_bbox = target_boxes[:, 1:5]
@@ -329,7 +337,8 @@ class YoloHeadsLoss(nn.Module):
         per_image_bbox = []
         per_image_pad_mask = []
         per_image_targets = undo_flat_collate_tensors_with_batch_index(target_joints, batch_size)
-        per_image_crowds = undo_flat_collate_tensors_with_batch_index(target_iscrowd, batch_size)
+        per_image_vertices = undo_flat_collate_tensors_with_batch_index(target_vertices, batch_size)
+        per_image_rotations = undo_flat_collate_tensors_with_batch_index(target_rotations, batch_size)
 
         max_boxes = 0
         for i in range(batch_size):
@@ -356,28 +365,31 @@ class YoloHeadsLoss(nn.Module):
             per_image_bbox[i] = F.pad(per_image_bbox[i], pad, mode="constant", value=0)
             per_image_pad_mask[i] = F.pad(per_image_pad_mask[i], pad, mode="constant", value=0)
             per_image_targets[i] = F.pad(per_image_targets[i], (0, 0) + pad, mode="constant", value=0)
-            per_image_crowds[i] = F.pad(per_image_crowds[i], pad, mode="constant", value=0)
+            per_image_vertices[i] = F.pad(per_image_vertices[i], (0, 0) + pad, mode="constant", value=0)
+            per_image_rotations[i] = F.pad(per_image_rotations[i], (0, 0) + pad, mode="constant", value=0)
 
         new_targets = {
             "gt_class": torch.stack(per_image_class, dim=0),
             "gt_bbox": torch.stack(per_image_bbox, dim=0),
             "pad_gt_mask": torch.stack(per_image_pad_mask, dim=0),
             "gt_poses": torch.stack(per_image_targets, dim=0),
-            "gt_crowd": torch.stack(per_image_crowds, dim=0),
+            "gt_vertices": torch.stack(per_image_vertices, dim=0),
+            "gt_rotations": torch.stack(per_image_rotations, dim=0),
         }
         return new_targets
 
     def forward(
         self,
         outputs: Tuple[YoloHeadsDecodedPredictions, YoloHeadsRawOutputs],
-        targets: Tuple[Tensor, Tensor, Tensor],
+        targets: Tuple[Tensor, Tensor, Tensor, Tensor],
     ) -> Tuple[Tensor, Tensor]:
         """
         :param outputs: Tuple of pred_scores, pred_distri, anchors, anchor_points, num_anchors_list, stride_tensor
-        :param targets: A tuple of (boxes, joints, crowd) tensors where
+        :param targets: A tuple of (boxes, joints, vertices, rotations) tensors where
                         - boxes: [N, 5] (batch_index, x1, y1, x2, y2)
                         - joints: [N, num_joints, 4] (batch_index, x, y, visibility)
-                        - crowd: [N, 2] (batch_index, is_crowd)
+                        - vertices: [N, num_vertices, 3] (batch_index, x, y, z)
+                        - rotations: [N, 3, 3] (rotations matrices)
         :return:        Tuple of two tensors where first element is main loss for backward and
                         second element is stacked tensor of all individual losses
         """
@@ -397,7 +409,8 @@ class YoloHeadsLoss(nn.Module):
         gt_labels = targets["gt_class"]
         gt_bboxes = targets["gt_bbox"]
         gt_poses = targets["gt_poses"]
-        gt_crowd = targets["gt_crowd"]
+        gt_vertices = targets["gt_vertices"]
+        gt_rotations = targets["gt_rotations"]
         pad_gt_mask = targets["pad_gt_mask"]
 
         # label assignment
@@ -408,7 +421,8 @@ class YoloHeadsLoss(nn.Module):
             gt_labels=gt_labels,
             gt_bboxes=gt_bboxes,
             gt_poses=gt_poses,
-            gt_crowd=gt_crowd,
+            gt_vertices=gt_vertices,
+            gt_rotations=gt_rotations,
             pad_gt_mask=pad_gt_mask,
             bg_index=self.num_classes,
         )
@@ -430,7 +444,7 @@ class YoloHeadsLoss(nn.Module):
         assigned_scores_sum = torch.clip(assigned_scores_sum, min=1.0)
         loss_cls /= assigned_scores_sum
 
-        loss_iou, loss_dfl, loss_pose_reg = self._bbox_loss(
+        loss_iou, loss_dfl, loss_pose_reg, loss_3d_vertices, loss_rotation = self._bbox_loss(
             pred_distri,
             pred_bboxes,
             pred_flame_params=pred_flame_params,
@@ -445,15 +459,16 @@ class YoloHeadsLoss(nn.Module):
         loss_iou = loss_iou * self.iou_loss_weight
         loss_dfl = loss_dfl * self.dfl_loss_weight
         loss_pose_reg = loss_pose_reg * self.pose_reg_loss_weight
+        loss_3d_vertices = loss_3d_vertices * 50
 
-        loss = loss_cls + loss_iou + loss_dfl + loss_pose_reg
-        log_losses = torch.stack([loss_cls.detach(), loss_iou.detach(), loss_dfl.detach(), loss_pose_reg.detach(), loss.detach()])
+        loss = loss_cls + loss_iou + loss_dfl + loss_pose_reg + loss_3d_vertices + loss_rotation
+        log_losses = torch.stack([loss_rotation.detach(), loss_cls.detach(), loss_iou.detach(), loss_dfl.detach(), loss_pose_reg.detach(), loss_3d_vertices.detach(), loss.detach()])
 
         return loss, log_losses
 
     @property
     def component_names(self):
-        return ["loss_cls", "loss_iou", "loss_dfl", "loss_pose_reg", "loss"]
+        return ["loss_3d_rotation", "loss_cls", "loss_iou", "loss_dfl", "loss_pose_reg", "loss_3d_vertices", "loss"]
 
     def _df_loss(self, pred_dist: Tensor, target: Tensor) -> Tensor:
         target_left = target.long()
@@ -468,6 +483,52 @@ class YoloHeadsLoss(nn.Module):
         loss_left = torch.nn.functional.cross_entropy(pred_dist, target_left, reduction="none") * weight_left
         loss_right = torch.nn.functional.cross_entropy(pred_dist, target_right, reduction="none") * weight_right
         return (loss_left + loss_right).mean(dim=-1, keepdim=True)
+
+    def _vertices_loss(
+        self,
+        predicted_coords: Tensor,
+        target_coords: Tensor,
+        assigned_scores: Optional[Tensor] = None,
+        assigned_scores_sum: Optional[Tensor] = None,
+    ) -> Tensor:
+        """
+
+        :param predicted_coords:  [Num Instances, Num Joints, 3] - (x, y, z)
+        :param target_coords:     [Num Instances, Num Joints, 3] - (x, y, z)
+        :return:                  Tuple of (regression loss, classification loss)
+                                  - regression loss [Num Instances, 1]
+                                  - classification loss [Num Instances, 1]
+        """
+        regression_loss = self.vertices_loss(predicted_coords, target_coords)
+
+        if assigned_scores is None:
+            regression_loss = regression_loss.mean()
+        else:
+            regression_loss = (regression_loss * assigned_scores).sum() / assigned_scores_sum
+        return regression_loss
+
+    def _rotation_loss(
+            self,
+            predicted_rotations: Tensor,
+            target_rotations: Tensor,
+            assigned_scores: Optional[Tensor] = None,
+            assigned_scores_sum: Optional[Tensor] = None,
+    ) -> Tensor:
+        """
+
+        :param predicted_rotations:  [Num Instances, 3, 3] - Rotation matrices
+        :param target_rotations:     [Num Instances, 3, 3] - Rotation matrices
+        :return:                     Tuple of (regression loss, classification loss)
+                                     - regression loss [Num Instances, 1]
+                                     - classification loss [Num Instances, 1]
+        """
+        regression_loss = self.rotation_loss(predicted_rotations, target_rotations)
+
+        if assigned_scores is None:
+            regression_loss = regression_loss.mean()
+        else:
+            regression_loss = (regression_loss * assigned_scores).sum() / assigned_scores_sum
+        return regression_loss
 
     def _keypoint_loss(
         self,
@@ -523,11 +584,7 @@ class YoloHeadsLoss(nn.Module):
         assigned_scores_sum,
         reg_max: int,
     ):
-        # select positive samples mask that are not crowd and not background
-        # loss ALWAYS respect the crowd targets by excluding them from contributing to the loss
-        # if you want to train WITH crowd targets, mark them as non-crowd on dataset level
-        # if you want to train WITH crowd targets, mark them as non-crowd on dataset level
-        mask_positive = (assign_result.assigned_labels != self.num_classes) * assign_result.assigned_crowd.eq(0)
+        mask_positive = (assign_result.assigned_labels != self.num_classes)
         num_pos = mask_positive.sum()
         assigned_bboxes_divided_by_stride = assign_result.assigned_bboxes / stride_tensor
 
@@ -554,8 +611,10 @@ class YoloHeadsLoss(nn.Module):
 
             # Do not divide poses by stride since this would skew the loss and make sigmas incorrect
             pred_flame_params = pred_flame_params[mask_positive]
-            pred_pose_coords = reproject_spatial_vertices(self.flame, pred_flame_params, to_2d=True)
+            pred_3d_vertices, pred_rotations, pred_pose_coords = reproject_spatial_vertices(self.flame, pred_flame_params, to_2d=True)
             gt_pose_coords = assign_result.assigned_poses[..., 0:2][mask_positive]
+            gt_vertices = assign_result.assigned_vertices[mask_positive]
+            gt_rotations = assign_result.assigned_rotations[mask_positive]
 
             area = self._xyxy_box_area(assigned_bboxes_pos_image_coord).reshape([-1, 1]) * 0.53
 
@@ -564,6 +623,8 @@ class YoloHeadsLoss(nn.Module):
             if self.indexes_subset is not None:
                 pred_pose_coords = pred_pose_coords[:, self.indexes_subset, :]
                 gt_pose_coords = gt_pose_coords[:, self.indexes_subset, :]
+                pred_3d_vertices = pred_3d_vertices[:, self.indexes_subset, :]
+                gt_vertices = gt_vertices[:, self.indexes_subset, :]
             elif self.random_indexes_fraction is not None:
                 # Randomly sample keypoints
                 int(random.random() * num_keypoins)
@@ -581,12 +642,27 @@ class YoloHeadsLoss(nn.Module):
                 area=area,
                 sigmas=self.oks_sigmas.to(pred_pose_coords.device),
             )
+            loss_3d_vertices = self._vertices_loss(
+                predicted_coords=pred_3d_vertices,
+                target_coords=gt_vertices,
+                assigned_scores=bbox_weight if self.rescale_pose_loss_with_assigned_score else None,
+                assigned_scores_sum=assigned_scores_sum if self.rescale_pose_loss_with_assigned_score else None,
+            )
+            loss_rotation = self._rotation_loss(
+                predicted_rotations=pred_rotations,
+                target_rotations=gt_rotations,
+                assigned_scores=bbox_weight if self.rescale_pose_loss_with_assigned_score else None,
+                assigned_scores_sum=assigned_scores_sum if self.rescale_pose_loss_with_assigned_score else None,
+            )
+
         else:
             loss_iou = torch.zeros([], device=pred_bboxes.device)
             loss_dfl = torch.zeros([], device=pred_bboxes.device)
             loss_pose_reg = torch.zeros([], device=pred_bboxes.device)
+            loss_3d_vertices = torch.zeros([], device=pred_bboxes.device)
+            loss_rotation = torch.zeros([], device=pred_bboxes.device)
 
-        return loss_iou, loss_dfl, loss_pose_reg
+        return loss_iou, loss_dfl, loss_pose_reg, loss_3d_vertices, loss_rotation
 
     def _bbox_decode(self, anchor_points: Tensor, pred_dist: Tensor) -> Tuple[Tensor, int]:
         """

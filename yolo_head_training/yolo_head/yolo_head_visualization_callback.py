@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from super_gradients.common.registry import register_callback
 from super_gradients.training.datasets.data_formats.bbox_formats.xywh import xywh_to_xyxy
-from super_gradients.training.samples import PoseEstimationSample
+from .mesh_sample import MeshEstimationSample
 from super_gradients.training.utils.callbacks.callbacks import ExtremeBatchCaseVisualizationCallback
 from super_gradients.training.utils.visualization.pose_estimation import PoseVisualization
 from torch import Tensor
@@ -136,7 +136,7 @@ class ExtremeBatchYoloHeadsVisualizationCallback(ExtremeBatchCaseVisualizationCa
             )
 
         inputs = self.universal_undo_preprocessing_fn(self.extreme_batch)
-        gt_samples: List[PoseEstimationSample] = self.extreme_additional_batch_items["gt_samples"]
+        gt_samples: List[MeshEstimationSample] = self.extreme_additional_batch_items["gt_samples"]
         predictions: List[YoloHeadsPredictions] = self.post_prediction_callback(self.extreme_preds)
 
         images_to_save_preds = self._visualize_batch(
@@ -151,7 +151,7 @@ class ExtremeBatchYoloHeadsVisualizationCallback(ExtremeBatchCaseVisualizationCa
 
         images_to_save_gt = self._visualize_batch(
             image_tensor=inputs,
-            keypoints=[gt.joints for gt in gt_samples],
+            keypoints=[gt.vertices_2d for gt in gt_samples],
             bboxes=[xywh_to_xyxy(gt.bboxes_xywh, image_shape=None) for gt in gt_samples],
             scores=None,
             is_crowd=[gt.is_crowd for gt in gt_samples],

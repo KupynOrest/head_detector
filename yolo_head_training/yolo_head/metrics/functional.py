@@ -9,7 +9,6 @@ from scipy.optimize import linear_sum_assignment
 from super_gradients.common.registry import register_metric
 from super_gradients.module_interfaces import AbstractPoseEstimationPostPredictionCallback, PoseEstimationPredictions
 from super_gradients.training.metrics.pose_estimation_utils import compute_oks
-from super_gradients.training.samples import PoseEstimationSample
 from torch import Tensor
 from torchmetrics import Metric
 

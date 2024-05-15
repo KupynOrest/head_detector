@@ -1,6 +1,6 @@
 defaults:
   - training_hyperparams: vgg_head_train_params
-  - dataset_params: vgg_head_large
+  - dataset_params: vgg_head_large_medium_albu_augs
   - arch_params: yolo_heads_m_arch_params
   - checkpoint_params: default_checkpoint_params
   - _self_
@@ -32,11 +32,11 @@ dataset_params:
 
   train_dataloader_params:
     persistent_workers: True
-    batch_size: 48
+    batch_size: 24
 
   val_dataloader_params:
     persistent_workers: True
-    batch_size: 48
+    batch_size: 24
 
 
 hydra:

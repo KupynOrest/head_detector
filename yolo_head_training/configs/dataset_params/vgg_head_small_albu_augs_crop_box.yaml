@@ -112,7 +112,7 @@ train_dataloader_params:
   num_workers: 8
   drop_last: True
   pin_memory: False
-  collate_fn: YoloNASPoseCollateFN
+  collate_fn: VGGHeadCollateFN
 
 val_dataloader_params:
   dataset: DAD3DHeadsDataset
@@ -120,4 +120,4 @@ val_dataloader_params:
   num_workers: 8
   drop_last: False
   pin_memory: False
-  collate_fn: YoloNASPoseCollateFN
+  collate_fn: VGGHeadCollateFN

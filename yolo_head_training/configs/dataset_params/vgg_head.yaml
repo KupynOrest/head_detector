@@ -22,31 +22,30 @@ train_dataset_params:
         vgain: 20
         prob: 1.0
 
-    - KeypointsRandomAffineTransform:
-        max_rotation: 45
-        min_scale: 0.5
-        max_scale: 2.0
-        max_translate: 0.1
-        image_pad_value: 127
-        mask_pad_value: 1
-        prob: 1.0
-        interpolation_mode: [0, 1, 2, 3, 4]
+#    - KeypointsRandomAffineTransform:
+#        max_rotation: 45
+#        min_scale: 0.5
+#        max_scale: 2.0
+#        max_translate: 0.1
+#        image_pad_value: 127
+#        mask_pad_value: 1
+#        prob: 1.0
+#        interpolation_mode: [0, 1, 2, 3, 4]
 
-    - KeypointsRandomRotate90:
-        prob: 1.0
+#    - KeypointsRandomRotate90:
+#        prob: 1.0
 
 #    - KeypointsMosaic:
 #        prob: 0.5
 
-    - KeypointsLongestMaxSize:
+    - MeshLongestMaxSize:
         max_height: ${dataset_params.image_size}
         max_width: ${dataset_params.image_size}
 
-    - KeypointsPadIfNeeded:
+    - MeshPadIfNeeded:
         min_height: ${dataset_params.image_size}
         min_width: ${dataset_params.image_size}
         image_pad_value: [127, 127, 127]
-        mask_pad_value: 1
         padding_mode: center
 
     - KeypointsImageStandardize:
@@ -62,15 +61,14 @@ val_dataset_params:
   num_joints: ${dataset_params.num_joints}
   mode: val
   transforms:
-    - KeypointsLongestMaxSize:
+    - MeshLongestMaxSize:
         max_height: ${dataset_params.image_size}
         max_width: ${dataset_params.image_size}
 
-    - KeypointsPadIfNeeded:
+    - MeshPadIfNeeded:
         min_height: ${dataset_params.image_size}
         min_width: ${dataset_params.image_size}
         image_pad_value: 127
-        mask_pad_value: 1
         padding_mode: bottom_right
 
     - KeypointsImageStandardize:
@@ -84,7 +82,7 @@ train_dataloader_params:
   num_workers: 8
   drop_last: True
   pin_memory: False
-  collate_fn: YoloNASPoseCollateFN
+  collate_fn: VGGHeadCollateFN
 
 val_dataloader_params:
   dataset: DAD3DHeadsDataset
@@ -92,4 +90,4 @@ val_dataloader_params:
   num_workers: 8
   drop_last: False
   pin_memory: False
-  collate_fn: YoloNASPoseCollateFN
+  collate_fn: VGGHeadCollateFN

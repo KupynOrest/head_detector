@@ -31,7 +31,6 @@ criterion_params:
   pose_reg_loss_weight: 5.0
   pose_classification_loss_type: focal
   rescale_pose_loss_with_assigned_score: False
-  assigner_multiply_by_pose_oks: False
 
 optimizer: AdamW
 optimizer_params:
@@ -76,7 +75,7 @@ valid_metrics_list:
 #        pre_nms_max_predictions: 300
 #        post_nms_max_predictions: 30
 
-visualization_frequency_epochs: 10
+visualization_frequency_epochs: 2
 
 phase_callbacks:
   - ExtremeBatchYoloHeadsVisualizationCallback:

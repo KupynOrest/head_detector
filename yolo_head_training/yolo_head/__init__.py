@@ -8,6 +8,8 @@ from .metrics import KeypointsNME, KeypointsFailureRate
 from .yolo_head_visualization_callback import ExtremeBatchYoloHeadsVisualizationCallback
 from .dataset import DAD3DHeadsDataset
 from .yolo_heads_neck import YoloHeadsNeck
+from .vgg_head_collate_fn import VGGHeadCollateFN
+from .transforms import MeshLongestMaxSize, MeshPadIfNeeded
 
 __all__ = [
     "ExtremeBatchYoloHeadsVisualizationCallback",
@@ -21,4 +23,7 @@ __all__ = [
     "YoloHeads_M",
     "KeypointsNME",
     "KeypointsFailureRate",
+    "VGGHeadCollateFN",
+    "MeshLongestMaxSize",
+    "MeshPadIfNeeded"
 ]

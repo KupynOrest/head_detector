@@ -1,7 +1,7 @@
 import os.path
 import pickle
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any, Optional, Union, Tuple
 from collections import namedtuple
 
 import einops
@@ -29,6 +29,13 @@ FLAME_CONSTS = {
     "translation": 3,
     "scale": 1,
 }
+
+
+@dataclass
+class RPY:
+    roll: float
+    pitch: float
+    yaw: float
 
 
 def rot_mat_from_6dof(v: torch.Tensor) -> torch.Tensor:
@@ -353,7 +360,7 @@ def rotation_mat_from_flame_params(flame_params):
     return rot_mat
 
 
-def reproject_spatial_vertices(flame: FLAMELayer, flame_params: Tensor, to_2d: bool = True, subset_indexes=None) -> Tensor:
+def reproject_spatial_vertices(flame: FLAMELayer, flame_params: Tensor, to_2d: bool = True, subset_indexes=None) -> Tuple[Tensor, Tensor, Tensor]:
     """
     :param flame_params: [..., Num Flame Params]
     :return: [..., Num Vertices, 2] if to_2d else [..., Num Vertices, 3]
@@ -365,11 +372,19 @@ def reproject_spatial_vertices(flame: FLAMELayer, flame_params: Tensor, to_2d: b
     # If there are no flame parameters, return zeros
     if flame_params.size(0) == 0:
         projected_vertices = torch.zeros((0,) + (flame.v_template.size(0), 2 if to_2d else 3), device=flame_params.device)
+        vertices = torch.zeros((0,) + (flame.v_template.size(0), 3), device=flame_params.device)
+        rotation_mat = torch.eye(3, device=flame_params.device).unsqueeze(0).expand(flame_params.size(0), 3, 3)
     else:
         flame_params_inp = FlameParams.from_3dmm(flame_params, FLAME_CONSTS)
-        pred_vertices = flame(flame_params_inp, zero_rot=False)
+        vertices = flame.forward(flame_params_inp, zero_rot=True)
+        # translate to skull center and rotate
+        rot_vertices = vertices.clone()
+        rot_vertices[:, :, 2] += MESH_OFFSET_Z
+        rotation_mat = rot_mat_from_6dof(flame_params_inp.rotation).type(vertices.dtype)
+        rot_vertices = torch.matmul(rotation_mat.unsqueeze(1), rot_vertices.unsqueeze(-1))
+        rot_vertices = rot_vertices[..., 0]
         scale = torch.clamp(flame_params_inp.scale[:, None], 1e-8)
-        projected_vertices = (pred_vertices * scale) + flame_params_inp.translation[:, None]  # [B, 1, 3]
+        projected_vertices = (rot_vertices * scale) + flame_params_inp.translation[:, None]  # [B, 1, 3]
 
     if subset_indexes is not None:
         projected_vertices = projected_vertices[:, subset_indexes]
@@ -378,7 +393,7 @@ def reproject_spatial_vertices(flame: FLAMELayer, flame_params: Tensor, to_2d: b
 
     # Reshape back to the original shape
     projected_vertices = projected_vertices.view(*shape[:-1], *projected_vertices.size()[-2:]).contiguous()
-    return projected_vertices
+    return vertices, rotation_mat, projected_vertices
 
 
 if __name__ == "__main__":

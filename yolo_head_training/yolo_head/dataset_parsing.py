@@ -4,7 +4,7 @@ from typing import Tuple, List, Optional, Dict
 import cv2
 import numpy as np
 import torch
-from yolo_head.flame import FlameParams, FLAMELayer
+from yolo_head.flame import FlameParams, FLAMELayer, rot_mat_from_6dof, MESH_OFFSET_Z
 
 # Pair of indexes corresponding to the 68 face keypoints
 # Indexes are 1-based
@@ -130,6 +130,7 @@ class HeadAnnotation:
     projected_vertices: np.ndarray
     vertices_3d: np.ndarray
     mm_params: np.ndarray
+    rotation_matrix: Optional[np.ndarray] = None
     points: Optional[np.ndarray] = None
 
     def get_face_bbox_xywh(self):
@@ -166,32 +167,41 @@ class SampleAnnotation:
     heads: List[HeadAnnotation]
 
 
-def get_vertices(annotation: Dict[str, np.ndarray], index: int, flame) -> Tuple[np.ndarray, np.ndarray]:
-    if "3d_vertices" in annotation.keys():
-        return np.array(annotation["3d_vertices"][index], dtype=np.float32), \
-               np.array(annotation["projected_vertices"][index][0], dtype=np.float32)
+def get_vertices(annotation: Dict[str, np.ndarray], index: int, flame) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     flame_params = FlameParams.from_3dmm(torch.from_numpy(annotation["3dmm_params"][index]), flame.flame_constants)
-    vertices = flame.forward(flame_params, zero_rot=False)
+    #ToDo: Return after fixing 3D Vertices in small dataset GT annotations
+    #if "3d_vertices" in annotation.keys():
+    #    rotation_mat = rot_mat_from_6dof(flame_params.rotation).type(torch.float32)
+    #    return np.array(annotation["3d_vertices"][index], dtype=np.float32), \
+    #           np.array(annotation["projected_vertices"][index][0], dtype=np.float32), rotation_mat.numpy()[0]
+    vertices = flame.forward(flame_params, zero_rot=True)
+    # translate to skull center and rotate
+    rot_vertices = vertices.clone()
+    rot_vertices[:, :, 2] += MESH_OFFSET_Z
+    rotation_mat = rot_mat_from_6dof(flame_params.rotation).type(vertices.dtype)
+    rot_vertices = torch.matmul(rotation_mat.unsqueeze(1), rot_vertices.unsqueeze(-1))
+    rot_vertices = rot_vertices[..., 0]
     scale = torch.clamp(flame_params.scale[:, None] + 1.0, 1e-8)
-    vertices *= scale  # [B, 1, 1]
+    rot_vertices *= scale  # [B, 1, 1]
     flame_params.translation[..., 2] = 0.0
-    vertices += flame_params.translation[:, None]  # [B, 1, 3]
-    projected_vertices = (vertices + 1.0) / 2.0 * DAD_SIZE
+    rot_vertices += flame_params.translation[:, None]  # [B, 1, 3]
+    projected_vertices = (rot_vertices + 1.0) / 2.0 * DAD_SIZE
     projected_vertices = projected_vertices[..., :2]
-    return vertices.numpy()[0], projected_vertices.numpy()[0]
+    return vertices.numpy()[0], projected_vertices.numpy()[0], rotation_mat.numpy()[0]
 
 
 def read_annotation(ann_file: str, flame) -> SampleAnnotation:
     ann = np.load(ann_file)
     head_anns = []
     for index in range(len(ann["3dmm_params"])):
-        vertices_3d, projected_vertices = get_vertices(ann, index, flame)
+        vertices_3d, projected_vertices, rotation_matrix = get_vertices(ann, index, flame)
         head_anns.append(
             HeadAnnotation(
                 bbox=tuple(ann["bbox"][index]),
                 extended_bbox=tuple(ann["extended_bbox"][index]),
                 projected_vertices=projected_vertices,
                 vertices_3d=vertices_3d,
+                rotation_matrix=rotation_matrix,
                 mm_params=np.array(ann["3dmm_params"][index][0], dtype=np.float32),
             )
         )

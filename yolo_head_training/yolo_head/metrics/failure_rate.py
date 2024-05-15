@@ -4,7 +4,6 @@ import torch
 import torch.nn
 from super_gradients.common.registry import register_metric
 from super_gradients.training.datasets.data_formats.bbox_formats.xywh import xywh_to_xyxy
-from super_gradients.training.samples import PoseEstimationSample
 from torch import Tensor
 from torchmetrics import Metric
 
@@ -12,6 +11,7 @@ from .functional import metrics_w_bbox_wrapper, match_head_boxes
 from ..yolo_heads_post_prediction_callback import YoloHeadsPostPredictionCallback
 from ..yolo_heads_predictions import YoloHeadsPredictions
 from ..flame import get_indices
+from ..mesh_sample import MeshEstimationSample
 
 
 def percentage_of_errors_below_IOD(
@@ -60,7 +60,7 @@ class KeypointsFailureRate(Metric):
         self,
         preds: Any,
         target: Any,
-        gt_samples: List[PoseEstimationSample],
+        gt_samples: List[MeshEstimationSample],
     ) -> None:
         """
         Update state with predictions and targets.
@@ -82,7 +82,7 @@ class KeypointsFailureRate(Metric):
             pred_vertices_2d = predictions[image_index].predicted_2d_vertices.cpu()
 
             true_bboxes_xywh = torch.from_numpy(gt_samples[image_index].bboxes_xywh)
-            true_keypoints = torch.from_numpy(gt_samples[image_index].joints)
+            true_keypoints = torch.from_numpy(gt_samples[image_index].vertices_2d)
 
             match_result = match_head_boxes(
                 pred_boxes_xyxy=pred_bboxes_xyxy,

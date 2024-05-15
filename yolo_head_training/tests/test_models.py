@@ -10,7 +10,7 @@ def test_flame():
     flame = FLAMELayer(consts=FLAME_CONSTS)
     params = torch.randn(1, 300 + 100 + 6 + 3 + 1 + 3)
 
-    predicted_3d_vertices = reproject_spatial_vertices(flame, params, to_2d=False)
+    _, _, predicted_3d_vertices = reproject_spatial_vertices(flame, params, to_2d=False)
     predicted_2d_vertices = predicted_3d_vertices[..., :2]
     print(predicted_2d_vertices.size())
 

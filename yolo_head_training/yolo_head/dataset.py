@@ -14,7 +14,7 @@ from super_gradients.common.registry.registry import register_dataset
 from super_gradients.training.datasets.pose_estimation_datasets.abstract_pose_estimation_dataset import (
     AbstractPoseEstimationDataset,
 )
-from super_gradients.training.samples import PoseEstimationSample
+from yolo_head.mesh_sample import MeshEstimationSample
 from super_gradients.training.transforms.keypoint_transforms import AbstractKeypointTransform
 from tqdm import tqdm
 
@@ -140,11 +140,11 @@ class DAD3DHeadsDataset(AbstractPoseEstimationDataset):
 
         return keep_images, keep_anns
 
-    def load_sample(self, index: int) -> PoseEstimationSample:
+    def load_sample(self, index: int) -> MeshEstimationSample:
         """
-        Read a sample from the disk and return a PoseEstimationSample
+        Read a sample from the disk and return a MeshEstimationSample
         :param index: Sample index
-        :return:      Returns an instance of PoseEstimationSample that holds complete sample (image and annotations)
+        :return:      Returns an instance of MeshEstimationSample that holds complete sample (image and annotations)
         """
         image_path: str = self.images[index]
         ann_path: str = self.ann_files[index]
@@ -161,11 +161,15 @@ class DAD3DHeadsDataset(AbstractPoseEstimationDataset):
 
         gt_joints = []
         gt_bboxes_xywh = []
+        gt_vertices = []
+        gt_rots = []
 
         for head in head_ann.heads:
             coords = head.get_reprojected_points_in_absolute_coords()
             # gt_joints.append(coords[self.indexes_subset["keypoint_445"]])
             gt_joints.append(coords)
+            gt_vertices.append(head.vertices_3d)
+            gt_rots.append(head.rotation_matrix)
             gt_bboxes_xywh.append(head.get_face_bbox_xywh())
 
         gt_bboxes_xywh = np.array(gt_bboxes_xywh).reshape(-1, 4)
@@ -176,19 +180,22 @@ class DAD3DHeadsDataset(AbstractPoseEstimationDataset):
         # num_keypoints = len(self.indexes_subset["keypoint_445"])
         gt_joints = np.stack(gt_joints).reshape(num_instances, -1, 2)
         # Add a 1 to the last dimension to get [N, Num Keypoints, 3]
+        gt_vertices = np.array(gt_vertices).reshape(num_instances, -1, 3)
+        gt_rots = np.array(gt_rots).reshape(num_instances, 3, 3)
         gt_joints = np.concatenate([gt_joints, np.ones((gt_joints.shape[0], gt_joints.shape[1], 1), dtype=gt_joints.dtype)], axis=-1)
 
-        return PoseEstimationSample(
+        return MeshEstimationSample(
             image=image,
-            mask=np.ones(image.shape[:2], dtype=np.float32),
-            joints=gt_joints,
+            vertices_2d=gt_joints,
+            vertices_3d=gt_vertices,
+            rotation_matrix=gt_rots,
             areas=gt_areas,
             bboxes_xywh=gt_bboxes_xywh,
             is_crowd=gt_iscrowd,
             additional_samples=None,
         )
 
-    def __getitem__(self, index: int) -> PoseEstimationSample:
+    def __getitem__(self, index: int) -> MeshEstimationSample:
         sample = self.load_sample(index)
         sample = self.transforms.apply_to_sample(sample)
 

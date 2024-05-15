@@ -83,7 +83,7 @@ class YoloHeadsPostPredictionCallback(AbstractPoseEstimationPostPredictionCallba
             final_scores = pred_bboxes_conf[idx_to_keep][: self.post_nms_max_predictions]  # [Instances, 1]
             final_params = pred_flame_params[idx_to_keep][: self.post_nms_max_predictions]  # [Instances, Flame Params]
 
-            final_3d_pts = reproject_spatial_vertices(flame_layer, final_params, to_2d=True)
+            _, _, final_3d_pts = reproject_spatial_vertices(flame_layer, final_params, to_2d=True)
             final_2d_pts = final_3d_pts[..., :2]
 
             p = YoloHeadsPredictions(
