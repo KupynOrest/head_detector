@@ -379,7 +379,6 @@ def reproject_spatial_vertices(flame: FLAMELayer, flame_params: Tensor, to_2d: b
         vertices = flame.forward(flame_params_inp, zero_rot=True)
         # translate to skull center and rotate
         rot_vertices = vertices.clone()
-        rot_vertices[:, :, 2] += MESH_OFFSET_Z
         rotation_mat = rot_mat_from_6dof(flame_params_inp.rotation).type(vertices.dtype)
         rot_vertices = torch.matmul(rotation_mat.unsqueeze(1), rot_vertices.unsqueeze(-1))
         rot_vertices = rot_vertices[..., 0]

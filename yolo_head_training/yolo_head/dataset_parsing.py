@@ -177,7 +177,6 @@ def get_vertices(annotation: Dict[str, np.ndarray], index: int, flame) -> Tuple[
     vertices = flame.forward(flame_params, zero_rot=True)
     # translate to skull center and rotate
     rot_vertices = vertices.clone()
-    rot_vertices[:, :, 2] += MESH_OFFSET_Z
     rotation_mat = rot_mat_from_6dof(flame_params.rotation).type(vertices.dtype)
     rot_vertices = torch.matmul(rotation_mat.unsqueeze(1), rot_vertices.unsqueeze(-1))
     rot_vertices = rot_vertices[..., 0]
