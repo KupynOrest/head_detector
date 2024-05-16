@@ -1,4 +1,6 @@
 from .mesh_longest_max_size import MeshLongestMaxSize
 from .mesh_pad_if_needed import MeshPadIfNeeded
+from .mesh_random_affine import MeshRandomAffineTransform
+from .mesh_random_rotate_90 import MeshRandomRotate90
 
-__all__ = ["MeshLongestMaxSize", "MeshPadIfNeeded"]
+__all__ = ["MeshLongestMaxSize", "MeshPadIfNeeded", "MeshRandomAffineTransform", "MeshRandomRotate90"]

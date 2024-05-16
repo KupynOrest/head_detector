@@ -9,7 +9,7 @@ from .yolo_head_visualization_callback import ExtremeBatchYoloHeadsVisualization
 from .dataset import DAD3DHeadsDataset
 from .yolo_heads_neck import YoloHeadsNeck
 from .vgg_head_collate_fn import VGGHeadCollateFN
-from .transforms import MeshLongestMaxSize, MeshPadIfNeeded
+from .transforms import MeshLongestMaxSize, MeshPadIfNeeded, MeshRandomAffineTransform, MeshRandomRotate90
 
 __all__ = [
     "ExtremeBatchYoloHeadsVisualizationCallback",
@@ -25,5 +25,7 @@ __all__ = [
     "KeypointsFailureRate",
     "VGGHeadCollateFN",
     "MeshLongestMaxSize",
-    "MeshPadIfNeeded"
+    "MeshPadIfNeeded",
+    "MeshRandomAffineTransform",
+    "MeshRandomRotate90",
 ]

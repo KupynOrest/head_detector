@@ -22,18 +22,18 @@ train_dataset_params:
         vgain: 20
         prob: 1.0
 
-#    - KeypointsRandomAffineTransform:
-#        max_rotation: 45
-#        min_scale: 0.5
-#        max_scale: 2.0
-#        max_translate: 0.1
-#        image_pad_value: 127
-#        mask_pad_value: 1
-#        prob: 1.0
-#        interpolation_mode: [0, 1, 2, 3, 4]
+    - MeshRandomAffineTransform:
+        max_rotation: 45
+        min_scale: 0.5
+        max_scale: 2.0
+        max_translate: 0.1
+        image_pad_value: 127
+        mask_pad_value: 1
+        prob: 0.5
+        interpolation_mode: [0, 1, 2, 3, 4]
 
-#    - KeypointsRandomRotate90:
-#        prob: 1.0
+    - MeshRandomRotate90:
+        prob: 0.5
 
 #    - KeypointsMosaic:
 #        prob: 0.5
