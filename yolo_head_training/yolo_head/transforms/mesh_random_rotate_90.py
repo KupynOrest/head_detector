@@ -55,14 +55,11 @@ class MeshRandomRotate90(AbstractKeypointTransform):
         :param factor:          Number of 90 degree rotations to apply. Order or rotation matches np.rot90
         :return:               Rotated 3x3 rotation matrix
         """
-        rot_mat_90 = np.array([
-            [1, 0, 0],
-            [0, 0, -1],
-            [0, 1, 0]
-        ])
+        angle = np.radians(90 * factor)
+        c = np.cos(angle)
+        s = np.sin(angle)
         for index in range(rotation_matrix.shape[0]):
-            for _ in range(factor):
-                rotation_matrix[index] = np.dot(rot_mat_90, rotation_matrix[index])
+            rotation_matrix[index] = np.dot(rotation_matrix[index], np.array([[1, 0, 0], [0, c, -s], [0, s, c]]))
         return rotation_matrix
 
     @classmethod
