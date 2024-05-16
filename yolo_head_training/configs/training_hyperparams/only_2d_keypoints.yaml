@@ -1,0 +1,113 @@
+defaults:
+  - default_train_params
+
+
+warmup_mode: "LinearBatchLRWarmup"
+warmup_initial_lr: 1e-6
+lr_warmup_steps: 128
+lr_warmup_epochs: 1
+
+initial_lr: 3e-4
+lr_mode: cosine
+cosine_final_lr_ratio: 0.1
+max_epochs: 200
+
+zero_weight_decay_on_bias_and_bn: True
+batch_accumulate: 1
+
+average_best_models: True
+save_ckpt_epoch_list: [ ]
+
+loss: YoloHeadsLoss
+
+criterion_params:
+  oks_sigma: ${dataset_params.oks_sigma}
+  indexes_subset: head # head, face, face_w_ears, keypoint_445
+  classification_loss_weight: 1.0
+  classification_loss_type: focal
+  regression_iou_loss_type: ciou
+  iou_loss_weight: 2.0
+  dfl_loss_weight: 0.01
+  pose_reg_loss_weight: 5.0
+  pose_classification_loss_type: focal
+  rescale_pose_loss_with_assigned_score: False
+  vertices_3d_loss_weight: 0
+  rotation_loss_weight: 0
+
+optimizer: AdamW
+optimizer_params:
+  weight_decay: 0.000001
+
+ema: False
+ema_params:
+  decay: 0.9997
+  decay_type: exp
+  beta: 50
+
+mixed_precision: True
+sync_bn: False
+
+valid_metrics_list:
+  - KeypointsFailureRate:
+      indexes_subset: head
+      post_prediction_callback:
+        _target_: yolo_head.yolo_heads_post_prediction_callback.YoloHeadsPostPredictionCallback
+        confidence_threshold: 0.5
+        nms_iou_threshold: 0.7
+        pre_nms_max_predictions: 300
+        post_nms_max_predictions: 30
+
+  - KeypointsNME:
+      indexes_subset: head
+      post_prediction_callback:
+        _target_: yolo_head.yolo_heads_post_prediction_callback.YoloHeadsPostPredictionCallback
+        confidence_threshold: 0.5
+        nms_iou_threshold: 0.7
+        pre_nms_max_predictions: 300
+        post_nms_max_predictions: 30
+
+#  - PoseEstimationMetrics:
+#      num_joints: ${dataset_params.num_joints}
+#      oks_sigmas: ${dataset_params.oks_sigmas}
+#      max_objects_per_image: 30
+#      post_prediction_callback:
+#        _target_: yolo_head.yolo_heads_post_prediction_callback.YoloHeadsPostPredictionCallback
+#        confidence_threshold: 0.01
+#        nms_iou_threshold: 0.7
+#        pre_nms_max_predictions: 300
+#        post_nms_max_predictions: 30
+
+visualization_frequency_epochs: 2
+
+phase_callbacks:
+  - ExtremeBatchYoloHeadsVisualizationCallback:
+      indexes_subset: head # head, face, face_w_ears, keypoint_445
+      loss_to_monitor: YoloHeadsLoss/loss
+      max: True
+      freq: ${training_hyperparams.visualization_frequency_epochs}
+      max_images: 16
+      enable_on_train_loader: True
+      enable_on_valid_loader: True
+      post_prediction_callback:
+        _target_: yolo_head.yolo_heads_post_prediction_callback.YoloHeadsPostPredictionCallback
+        confidence_threshold: 0.5
+        nms_iou_threshold: 0.7
+        pre_nms_max_predictions: 300
+        post_nms_max_predictions: 30
+
+#  - EarlyStop:
+#      phase:
+#        _target_: super_gradients.training.utils.callbacks.base_callbacks.Phase
+#        value: VALIDATION_EPOCH_END
+#      monitor: AP
+#      mode: max
+#      min_delta: 0.0001
+#      patience: 100
+#      verbose: True
+
+pre_prediction_callback:
+
+metric_to_watch: 'KeypointsNME'
+greater_metric_to_watch_is_better: False
+
+_convert_: all

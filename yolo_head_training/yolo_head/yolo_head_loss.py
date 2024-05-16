@@ -262,6 +262,8 @@ class YoloHeadsLoss(nn.Module):
         bbox_assigned_beta: float = 6.0,
         rescale_pose_loss_with_assigned_score: bool = False,
         average_losses_in_ddp: bool = False,
+        vertices_3d_loss_weight: float = 50.0,
+        rotation_loss_weight: float = 1.0,
     ):
         """
         :param oks_sigma:                 OKS sigmas for pose estimation. Array of [Num Keypoints].
@@ -284,7 +286,11 @@ class YoloHeadsLoss(nn.Module):
 
         self.iou_loss = {"giou": GIoULoss, "ciou": CIoULoss}[regression_iou_loss_type]()
         self.vertices_loss = Vertices3DLoss(criterion=vertices_loss)
+        self.vertices_3d_loss_weight = vertices_3d_loss_weight
+
         self.rotation_loss = {"frobenius": FrobeniusNormLoss, "geodesic": GeodesicLoss, "cosine": CosineRotationLoss}[rotation_loss]()
+        self.rotation_loss_weight = rotation_loss_weight
+
         self.num_classes = 1  # We have only one class in pose estimation task
         self.oks_sigmas = torch.tensor([oks_sigma]).view(1, 1)
         self.pose_reg_loss_weight = pose_reg_loss_weight
@@ -459,10 +465,21 @@ class YoloHeadsLoss(nn.Module):
         loss_iou = loss_iou * self.iou_loss_weight
         loss_dfl = loss_dfl * self.dfl_loss_weight
         loss_pose_reg = loss_pose_reg * self.pose_reg_loss_weight
-        loss_3d_vertices = loss_3d_vertices * 50
+        loss_3d_vertices = loss_3d_vertices * self.vertices_3d_loss_weight
+        loss_rotation = loss_rotation * self.rotation_loss_weight
 
         loss = loss_cls + loss_iou + loss_dfl + loss_pose_reg + loss_3d_vertices + loss_rotation
-        log_losses = torch.stack([loss_rotation.detach(), loss_cls.detach(), loss_iou.detach(), loss_dfl.detach(), loss_pose_reg.detach(), loss_3d_vertices.detach(), loss.detach()])
+        log_losses = torch.stack(
+            [
+                loss_rotation.detach(),
+                loss_cls.detach(),
+                loss_iou.detach(),
+                loss_dfl.detach(),
+                loss_pose_reg.detach(),
+                loss_3d_vertices.detach(),
+                loss.detach(),
+            ]
+        )
 
         return loss, log_losses
 
@@ -508,11 +525,11 @@ class YoloHeadsLoss(nn.Module):
         return regression_loss
 
     def _rotation_loss(
-            self,
-            predicted_rotations: Tensor,
-            target_rotations: Tensor,
-            assigned_scores: Optional[Tensor] = None,
-            assigned_scores_sum: Optional[Tensor] = None,
+        self,
+        predicted_rotations: Tensor,
+        target_rotations: Tensor,
+        assigned_scores: Optional[Tensor] = None,
+        assigned_scores_sum: Optional[Tensor] = None,
     ) -> Tensor:
         """
 
@@ -584,7 +601,7 @@ class YoloHeadsLoss(nn.Module):
         assigned_scores_sum,
         reg_max: int,
     ):
-        mask_positive = (assign_result.assigned_labels != self.num_classes)
+        mask_positive = assign_result.assigned_labels != self.num_classes
         num_pos = mask_positive.sum()
         assigned_bboxes_divided_by_stride = assign_result.assigned_bboxes / stride_tensor
 
