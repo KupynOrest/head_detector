@@ -148,7 +148,7 @@ train_dataset_params:
         vgain: 20
         prob: 0.5
 
-    - KeypointsRandomAffineTransform:
+    - MeshRandomAffineTransform:
         max_rotation: 45
         min_scale: 0.5
         max_scale: 2.0
@@ -158,21 +158,20 @@ train_dataset_params:
         prob: 0.35
         interpolation_mode: [0, 1, 2, 3, 4]
 
-    - KeypointsRandomRotate90:
+    - MeshRandomRotate90:
         prob: 0.2
 
 #    - KeypointsMosaic:
 #        prob: 0.5
 
-    - KeypointsLongestMaxSize:
+    - MeshLongestMaxSize:
         max_height: ${dataset_params.image_size}
         max_width: ${dataset_params.image_size}
 
-    - KeypointsPadIfNeeded:
+    - MeshPadIfNeeded:
         min_height: ${dataset_params.image_size}
         min_width: ${dataset_params.image_size}
         image_pad_value: [127, 127, 127]
-        mask_pad_value: 1
         padding_mode: center
 
     - KeypointsImageStandardize:

@@ -1,5 +1,5 @@
 import torch
-from diffusers import StableDiffusionXLAdapterPipeline, T2IAdapter, EulerAncestralDiscreteScheduler, AutoencoderKL
+from diffusers import StableDiffusionXLAdapterPipeline, T2IAdapter, DPMSolverMultistepScheduler, AutoencoderKL
 
 
 def get_pipeline() -> StableDiffusionXLAdapterPipeline:
@@ -12,7 +12,7 @@ def get_pipeline() -> StableDiffusionXLAdapterPipeline:
     pipe = StableDiffusionXLAdapterPipeline.from_pretrained(
         model_id, adapter=adapter, torch_dtype=torch.float16, variant="fp16",
     )
-    pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(pipe.scheduler.config)
+    pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config, algorithm_type="sde-dpmsolver++", use_karras_sigmas=True)
     pipe = pipe.to("cuda")
     pipe.enable_xformers_memory_efficient_attention()
 

@@ -7,7 +7,7 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --exclude=gnodee1,gnodeg3
 #SBATCH --constraint=gmem48G
-#SBATCH --array=0-99%4
+#SBATCH --array=90-99%4
 ##SBATCH --mail-user=okupyn@robots.ox.ac.uk
 ##SBATCH --mail-type=START,END,FAIL,ARRAY_TASKS
 pwd; hostname; date

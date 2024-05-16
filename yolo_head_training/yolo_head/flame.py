@@ -91,7 +91,7 @@ def get_191_keypoints(name):
 
 def get_indices():
     keypoint_445 = get_445_keypoints_indexes()
-    head_indices = load_indices(str(Path(__file__).parent / "flame_indices" / "head.npy"))
+    head_indices = load_indices(str(Path(__file__).parent / "flame_indices" / "head_indices.npy"))
     face_indices = load_indices(str(Path(__file__).parent / "flame_indices" / "face.npy"))
     face_w_ears = load_indices(str(Path(__file__).parent / "flame_indices" / "face_w_ears.npy"))
     return {
