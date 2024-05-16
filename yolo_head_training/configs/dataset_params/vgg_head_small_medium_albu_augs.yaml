@@ -11,31 +11,31 @@ train_dataset_params:
   num_joints: ${dataset_params.num_joints}
   mode: train
   transforms:
-    - Albumentations:
-        Compose:
-          bbox_params:
-            min_width: 8
-            min_area: 10
-            min_height: 8
-            check_each_transform: True
-            min_visibility: 0.1
-
-          keypoint_params: {}
-          transforms:
-            - ImageCompression:
-                quality_lower: 60
-                quality_upper: 100
-                p: 0.25
-            - MedianBlur:
-                blur_limit: 5
-                p: 0.125
-            - GaussianBlur:
-                blur_limit: 5
-                p: 0.125
-            - RGBShift:
-                p: 0.125
-            - ToGray:
-                p: 0.125
+#    - Albumentations:
+#        Compose:
+#          bbox_params:
+#            min_width: 8
+#            min_area: 10
+#            min_height: 8
+#            check_each_transform: True
+#            min_visibility: 0.1
+#
+#          keypoint_params: {}
+#          transforms:
+#            - ImageCompression:
+#                quality_lower: 60
+#                quality_upper: 100
+#                p: 0.25
+#            - MedianBlur:
+#                blur_limit: 5
+#                p: 0.125
+#            - GaussianBlur:
+#                blur_limit: 5
+#                p: 0.125
+#            - RGBShift:
+#                p: 0.125
+#            - ToGray:
+#                p: 0.125
 
     - KeypointsBrightnessContrast:
         brightness_range: [ 0.8, 1.2 ]
@@ -48,31 +48,30 @@ train_dataset_params:
         vgain: 20
         prob: 0.5
 
-    - KeypointsRandomAffineTransform:
+    - MeshRandomAffineTransform:
         max_rotation: 45
         min_scale: 0.5
         max_scale: 2.0
         max_translate: 0.1
         image_pad_value: 127
         mask_pad_value: 1
-        prob: 0.5
+        prob: 0.35
         interpolation_mode: [0, 1, 2, 3, 4]
 
-    - KeypointsRandomRotate90:
-        prob: 0.5
+    - MeshRandomRotate90:
+        prob: 0.2
 
 #    - KeypointsMosaic:
 #        prob: 0.5
 
-    - KeypointsLongestMaxSize:
+    - MeshLongestMaxSize:
         max_height: ${dataset_params.image_size}
         max_width: ${dataset_params.image_size}
 
-    - KeypointsPadIfNeeded:
+    - MeshPadIfNeeded:
         min_height: ${dataset_params.image_size}
         min_width: ${dataset_params.image_size}
         image_pad_value: [127, 127, 127]
-        mask_pad_value: 1
         padding_mode: center
 
     - KeypointsImageStandardize:
@@ -88,15 +87,14 @@ val_dataset_params:
   num_joints: ${dataset_params.num_joints}
   mode: val
   transforms:
-    - KeypointsLongestMaxSize:
+    - MeshLongestMaxSize:
         max_height: ${dataset_params.image_size}
         max_width: ${dataset_params.image_size}
 
-    - KeypointsPadIfNeeded:
+    - MeshPadIfNeeded:
         min_height: ${dataset_params.image_size}
         min_width: ${dataset_params.image_size}
         image_pad_value: 127
-        mask_pad_value: 1
         padding_mode: bottom_right
 
     - KeypointsImageStandardize:
