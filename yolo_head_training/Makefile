@@ -53,23 +53,12 @@ yolo_heads_m_large_medium_albu_augs_eugene:
 
 yolo_heads_m_small_eugene_grid_search:
 	python train.py --config-name=yolo_heads_m_small_eugene \
-    training_hyperparams.criterion_params.indexes_subset=head experiment_suffix='_head' \
+    training_hyperparams=vgg_head_train_params \
     dataset_params.train_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/small \
     dataset_params.val_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/small \
     num_gpus=4 multi_gpu=DDP
 	python train.py --config-name=yolo_heads_m_small_eugene \
-    training_hyperparams.criterion_params.indexes_subset=face experiment_suffix='face' \
+    training_hyperparams=only_2d_keypoints \
     dataset_params.train_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/small \
     dataset_params.val_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/small \
     num_gpus=4 multi_gpu=DDP
-	python train.py --config-name=yolo_heads_m_small_eugene \
-    training_hyperparams.criterion_params.indexes_subset=face_w_ears experiment_suffix='face_w_ears' \
-    dataset_params.train_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/small \
-    dataset_params.val_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/small \
-    num_gpus=4 multi_gpu=DDP
-	python train.py --config-name=yolo_heads_m_small_eugene \
-    training_hyperparams.criterion_params.indexes_subset=keypoint_445 experiment_suffix='keypoint_445' \
-    dataset_params.train_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/small \
-    dataset_params.val_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/small \
-    num_gpus=4 multi_gpu=DDP
-
