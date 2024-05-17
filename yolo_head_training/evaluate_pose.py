@@ -39,8 +39,11 @@ def limit_angle(angle: Union[int, float], pi: Union[int, float] = 180.0) -> Unio
 
 
 class HeadPoseEvaluator:
-    def __init__(self, model_name: str = "YoloHeads_M", checkpoint: str = "ckpt_best.pth"):
+    def __init__(self, data_dir: str, model_name: str = "YoloHeads_M", checkpoint: str = "ckpt_best.pth"):
+        self.dataset_dir = data_dir
         self.model = models.get(model_name, checkpoint_path=checkpoint, num_classes=413).eval()
+        if torch.cuda.is_available():
+            self.model = self.model.cuda()
 
     @abc.abstractmethod
     def get_gt_pose(self, label_path: str) -> Optional[Tuple[RPY, Any]]:
@@ -73,20 +76,18 @@ class HeadPoseEvaluator:
 
     def predict(self, image, metadata: Any, dsize: int = 640):
         device = infer_model_device(self.model)
+
+        # Resize image to dsize x dsize but keep the aspect ratio by padding with zeros
         original_shape = image.shape[:2]
-        scale_w, scale_h = dsize / original_shape[1], dsize / original_shape[0]
-        if scale_w > scale_h:
-            new_shape = (dsize, int(original_shape[0] * scale_w))
-            scale = scale_w
-        else:
-            new_shape = (int(original_shape[1] * scale_h), dsize)
-            scale = scale_h
+        # resize to dsize max side
+        scale = dsize / max(original_shape)
+        new_shape = (int(original_shape[1] * scale), int(original_shape[0] * scale))
         image = cv2.resize(image, new_shape)
 
         # Pad the image with zeros
         # For simplicity, we do bottom and right padding to simply the calculations in post-processing
-        pad_w = dsize - new_shape[1]
-        pad_h = dsize - new_shape[0]
+        pad_w = dsize - image.shape[1]
+        pad_h = dsize - image.shape[0]
         image = cv2.copyMakeBorder(image, 0, pad_h, 0, pad_w, cv2.BORDER_CONSTANT, value=127)
 
         image_input = torch.from_numpy(image).to(device).permute(2, 0, 1).unsqueeze(0).float() / 255.0
@@ -106,13 +107,14 @@ class HeadPoseEvaluator:
         predictions.mm_params = flame.to_3dmm_tensor()
         return predictions, flame
 
-    def __call__(self, dataset_dir: str, *args, **kwargs):
-        images, labels = self.find_images_and_labels(dataset_dir)
+    def __call__(self, *args, **kwargs):
+        images, labels = self.find_images_and_labels(self.dataset_dir)
         metrics = {
             "roll": [],
             "pitch": [],
             "yaw": [],
         }
+        fail_cases = 0
         for image_path, gt in tqdm.tqdm(zip(images, labels)):
             try:
                 image = cv2.imread(str(image_path))
@@ -120,18 +122,20 @@ class HeadPoseEvaluator:
                 if ground_truth is None:
                     continue
                 gt_pose, metadata = ground_truth
-                predictions, flame_params = self.predict(image)
+                predictions, flame_params = self.predict(image, metadata)
                 pred_pose = self.calculate_rpy(flame_params)
                 metrics["roll"].append(self.mae(gt_pose.roll, pred_pose.roll))
                 metrics["pitch"].append(self.mae(gt_pose.pitch, pred_pose.pitch))
                 metrics["yaw"].append(self.mae(gt_pose.yaw, pred_pose.yaw))
-            except:
-                pass
+            except Exception as e:
+                fail_cases += 1
+                print(f"Failed to process {image_path}: {e}")
         roll_mae = np.mean(np.array(metrics["roll"]))
         pitch_mae = np.mean(np.array(metrics["pitch"]))
         yaw_mae = np.mean(np.array(metrics["yaw"]))
         print(
             f"Roll MAE: {roll_mae}, Pitch MAE: {pitch_mae}, Yaw MAE: {yaw_mae}, MAE = {(roll_mae + pitch_mae + yaw_mae) / 3}")
+        print(f"Failed cases: {fail_cases}")
 
 
 class AFLWEvaluator(HeadPoseEvaluator):
@@ -233,7 +237,7 @@ class BIWIEvaluator(HeadPoseEvaluator):
         max_index = 0
         for index, bbox in enumerate(bboxes):
             bbox_center = np.array([bbox[0] + bbox[2], bbox[1] + bbox[3]]) / 2
-            CENTER = np.array(320, 320)
+            CENTER = np.array((320, 320))
             distance_to_center = np.linalg.norm(bbox_center - CENTER)
             if distance_to_center < min_distance:
                 min_distance = distance_to_center
@@ -246,10 +250,12 @@ class BIWIEvaluator(HeadPoseEvaluator):
         return predictions
 
 
-def main(model_name="YoloHeads_M", checkpoint="C:/Develop/GitHub/VGG/head_detector/yolo_head_training/weights/ckpt_best.pth", dataset_dir="g:/AFLW2000"):
-    evaluators = [AFLWEvaluator(model_name=model_name, checkpoint=checkpoint)]
-    for evaluator in evaluators:
-        evaluator(dataset_dir)
+def main(model_name: str = "YoloHeads_M", checkpoint: str = "ckpt_best.pth", aflw_dir: str = "g:/AFLW2000", biwi_dir: Optional[str] = None):
+    evaluators = [AFLWEvaluator(data_dir=aflw_dir, model_name=model_name, checkpoint=checkpoint)]
+    if biwi_dir is not None:
+        evaluators.append(BIWIEvaluator(data_dir=biwi_dir, model_name=model_name, checkpoint=checkpoint))
+    for evaluator in evaluators[1:]:
+        evaluator()
 
 
 if __name__ == "__main__":
