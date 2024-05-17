@@ -254,7 +254,7 @@ def main(model_name: str = "YoloHeads_M", checkpoint: str = "ckpt_best.pth", afl
     evaluators = [AFLWEvaluator(data_dir=aflw_dir, model_name=model_name, checkpoint=checkpoint)]
     if biwi_dir is not None:
         evaluators.append(BIWIEvaluator(data_dir=biwi_dir, model_name=model_name, checkpoint=checkpoint))
-    for evaluator in evaluators[1:]:
+    for evaluator in evaluators:
         evaluator()
 
 
