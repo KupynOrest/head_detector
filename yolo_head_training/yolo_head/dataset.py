@@ -5,7 +5,7 @@ from typing import List, Optional, Tuple
 
 import cv2
 import numpy as np
-from pytorch_toolbelt.utils import fs
+import albumentations as A
 from super_gradients.common.abstractions.abstract_logger import get_logger
 from super_gradients.common.decorators.factory_decorator import resolve_param
 from super_gradients.common.factories.transforms_factory import TransformsFactory
@@ -64,28 +64,15 @@ class DAD3DHeadsDataset(AbstractPoseEstimationDataset):
         self.flame = FLAMELayer(consts=FLAME_CONSTS)
         self.crop_bbox_to_visible_keypoints = crop_bbox_to_visible_keypoints
 
-        if False:
-            # A check to keep only large boxes
-            keep_images = []
-            keep_anns = []
-
-            for image, ann_file in zip(tqdm(images), ann_files):
-                ann = read_annotation(ann_file, self.flame)
-                image_h, image_w = cv2.imread(image).shape[:2]
-                scale = 640 / max(image_h, image_w)
-
-                if len(ann.heads) == 0:
-                    continue
-
-                # Filter all images where minimal head is smaller than 192x192 in 640x640 image
-                min_head_area = min([head.get_face_bbox_area() * scale * scale for head in ann.heads])
-                if min_head_area < 192 * 192:
-                    continue
-                keep_images.append(image)
-                keep_anns.append(ann_file)
-
-            images = keep_images
-            ann_files = keep_anns
+        self.albu_augs = A.Compose(
+            [
+                A.ImageCompression(quality_lower=60, quality_upper=100, p=0.25),
+                A.MedianBlur(blur_limit=5, p=0.125),
+                A.GaussianBlur(blur_limit=5, p=0.125),
+                A.RGBShift(p=0.125),
+                A.ToGray(p=0.125),
+            ]
+        )
 
         self.images = np.array(images)
         self.ann_files = np.array(ann_files)
@@ -156,6 +143,8 @@ class DAD3DHeadsDataset(AbstractPoseEstimationDataset):
             image_path = self.images[new_index]
             ann_path = self.ann_files[new_index]
             image = cv2.imread(image_path, cv2.IMREAD_COLOR)
+
+        image = self.albu_augs(image=image)["image"]
 
         head_ann: SampleAnnotation = read_annotation(ann_path, self.flame)
 
