@@ -48,6 +48,14 @@ mixed_precision: True
 sync_bn: False
 
 valid_metrics_list:
+  - RPYError:
+      post_prediction_callback:
+        _target_: yolo_head.yolo_heads_post_prediction_callback.YoloHeadsPostPredictionCallback
+        confidence_threshold: 0.5
+        nms_iou_threshold: 0.7
+        pre_nms_max_predictions: 300
+        post_nms_max_predictions: 30
+
   - KeypointsFailureRate:
       indexes_subset: head
       post_prediction_callback:
