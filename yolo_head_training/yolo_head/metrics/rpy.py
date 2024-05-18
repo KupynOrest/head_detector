@@ -75,7 +75,7 @@ class RPYError(Metric):
             )
 
             for pred_index, true_index in match_result.tp_matches:
-                pred_mmparams_i = pred_mmparams[pred_index]
+                pred_mmparams_i = pred_mmparams[pred_index:pred_index+1]
                 flame = FlameParams.from_3dmm(pred_mmparams_i, FLAME_CONSTS)
                 pred_rpy = self.calculate_rpy_from_flame(flame)
                 true_rpy = self.calculate_rpy_from_rotation_mat(true_rotation_matrix[true_index])
