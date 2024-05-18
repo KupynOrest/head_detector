@@ -89,47 +89,52 @@ neck:
 
 heads:
   YoloHeadsNDFLHeads:
-    num_classes: 413
     reg_max: 16
     heads_list:
       - YoloHeadsDFLHead:
           bbox_inter_channels: 128
-          flame_inter_channels: 128
-          flame_regression_blocks: 2
+          flame_inter_channels: 256
+          flame_regression_blocks: 3
+          flame_shape_inter_channels: 256
+          flame_expression_inter_channels: 128
+          flame_shape_out_channels: 128
+          flame_expression_out_channels: 64
+          flame_transformation_inter_channels: 32
           shared_stem: False
           width_mult: 1
           first_conv_group_size: 0
-          num_classes:
           stride: 8
           reg_max: 16
-          cls_dropout_rate: 0.0
-          reg_dropout_rate: 0.0
 
       - YoloHeadsDFLHead:
           bbox_inter_channels: 256
-          flame_inter_channels: 512
-          flame_regression_blocks: 2
+          flame_inter_channels: 256
+          flame_regression_blocks: 3
+          flame_shape_inter_channels: 256
+          flame_expression_inter_channels: 128
+          flame_shape_out_channels: 128
+          flame_expression_out_channels: 64
+          flame_transformation_inter_channels: 32
           shared_stem: False
           width_mult: 1
           first_conv_group_size: 0
-          num_classes:
           stride: 16
           reg_max: 16
-          cls_dropout_rate: 0.0
-          reg_dropout_rate: 0.0
 
       - YoloHeadsDFLHead:
           bbox_inter_channels: 512
-          flame_inter_channels: 512
+          flame_inter_channels: 256
           flame_regression_blocks: 3
+          flame_shape_inter_channels: 256
+          flame_expression_inter_channels: 128
+          flame_shape_out_channels: 128
+          flame_expression_out_channels: 64
+          flame_transformation_inter_channels: 32
           shared_stem: False
           width_mult: 1
           first_conv_group_size: 0
-          num_classes:
           stride: 32
           reg_max: 16
-          cls_dropout_rate: 0.0
-          reg_dropout_rate: 0.0
 
 bn_eps: 1e-6
 bn_momentum: 0.03
