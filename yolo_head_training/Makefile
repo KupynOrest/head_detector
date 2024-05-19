@@ -69,3 +69,9 @@ yolo_heads_m_small_eugene_grid_search:
     dataset_params.train_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/small \
     dataset_params.val_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/small \
     num_gpus=4 multi_gpu=DDP
+
+yolo_heads_l_large_eugene:
+	python train.py --config-name=yolo_heads_l_large_eugene \
+    dataset_params.train_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/large \
+    dataset_params.val_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/large \
+    num_gpus=4 multi_gpu=DDP
