@@ -141,7 +141,7 @@ class MeshRandomAffineTransform(AbstractKeypointTransform):
         c = np.cos(angle)
         s = np.sin(angle)
         for index in range(rotation_matrix.shape[0]):
-            rotation_matrix[index] = np.dot(rotation_matrix[index], np.array([[1, 0, 0], [0, c, -s], [0, s, c]]))
+            rotation_matrix[index] = np.dot(rotation_matrix[index], np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]]))
         return rotation_matrix
 
     @classmethod
