@@ -190,12 +190,12 @@ class DAD3DHeadsDataset(AbstractPoseEstimationDataset):
 
         # Update bounding boxes and areas to match the visible joints area
         if self.crop_bbox_to_visible_keypoints:
-            if len(sample.joints):
-                visible_joints = sample.joints[:, :, 2] > 0
-                xmax = np.max(sample.joints[:, :, 0], axis=-1, where=visible_joints, initial=sample.joints[:, :, 0].min())
-                xmin = np.min(sample.joints[:, :, 0], axis=-1, where=visible_joints, initial=sample.joints[:, :, 0].max())
-                ymax = np.max(sample.joints[:, :, 1], axis=-1, where=visible_joints, initial=sample.joints[:, :, 1].min())
-                ymin = np.min(sample.joints[:, :, 1], axis=-1, where=visible_joints, initial=sample.joints[:, :, 1].max())
+            if len(sample.vertices_2d):
+                visible_joints = sample.vertices_2d[:, :, 2] > 0
+                xmax = np.max(sample.vertices_2d[:, :, 0], axis=-1, where=visible_joints, initial=sample.vertices_2d[:, :, 0].min())
+                xmin = np.min(sample.vertices_2d[:, :, 0], axis=-1, where=visible_joints, initial=sample.vertices_2d[:, :, 0].max())
+                ymax = np.max(sample.vertices_2d[:, :, 1], axis=-1, where=visible_joints, initial=sample.vertices_2d[:, :, 1].min())
+                ymin = np.min(sample.vertices_2d[:, :, 1], axis=-1, where=visible_joints, initial=sample.vertices_2d[:, :, 1].max())
 
                 w = xmax - xmin
                 h = ymax - ymin
