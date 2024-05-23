@@ -93,8 +93,7 @@ class HeadPoseEvaluator:
         image_input = torch.from_numpy(image).to(device).permute(2, 0, 1).unsqueeze(0).float() / 255.0
 
         raw_predictions = self.model(image_input)
-        (predictions,) = self.model.get_post_prediction_callback(conf=0.5, iou=0.5, post_nms_max_predictions=30)(
-            raw_predictions)
+        (predictions,) = self.model.get_post_prediction_callback(conf=0.5, iou=0.5, post_nms_max_predictions=30)(raw_predictions)
         if predictions.bboxes_xyxy.shape[0] > 1:
             predictions = self.select_head(predictions, metadata)
 
@@ -133,8 +132,7 @@ class HeadPoseEvaluator:
         roll_mae = np.mean(np.array(metrics["roll"]))
         pitch_mae = np.mean(np.array(metrics["pitch"]))
         yaw_mae = np.mean(np.array(metrics["yaw"]))
-        print(
-            f"Roll MAE: {roll_mae}, Pitch MAE: {pitch_mae}, Yaw MAE: {yaw_mae}, MAE = {(roll_mae + pitch_mae + yaw_mae) / 3}")
+        print(f"Roll MAE: {roll_mae}, Pitch MAE: {pitch_mae}, Yaw MAE: {yaw_mae}, MAE = {(roll_mae + pitch_mae + yaw_mae) / 3}")
         print(f"Failed cases: {fail_cases}")
 
 
@@ -179,8 +177,7 @@ class AFLWEvaluator(HeadPoseEvaluator):
         labels = list(sorted(dataset_dir.glob("*.mat")))
 
         if len(images) != len(labels):
-            raise ValueError(
-                f"Number of images and labels do not match. There are {len(images)} images and {len(labels)} labels.")
+            raise ValueError(f"Number of images and labels do not match. There are {len(images)} images and {len(labels)} labels.")
 
         images = []
         for label_path in labels:
@@ -202,8 +199,7 @@ class AFLWEvaluator(HeadPoseEvaluator):
         degrees = pose_params[:3] * (180 / np.pi)
         if np.any(np.abs(degrees) > MAX_ROTATION):
             return None
-        return RPY(roll=degrees[2], pitch=degrees[0], yaw=degrees[1]), self.bbox_from_keypoints(
-            np.asarray(mat['pt3d_68']).T[:, :2])
+        return RPY(roll=degrees[2], pitch=degrees[0], yaw=degrees[1]), self.bbox_from_keypoints(np.asarray(mat["pt3d_68"]).T[:, :2])
 
 
 class BIWIEvaluator(HeadPoseEvaluator):
@@ -219,11 +215,7 @@ class BIWIEvaluator(HeadPoseEvaluator):
         rotation_matrix = np.transpose(rotation_matrix)
 
         roll = -np.arctan2(rotation_matrix[1][0], rotation_matrix[0][0]) * 180 / np.pi
-        yaw = (
-                -np.arctan2(-rotation_matrix[2][0], np.sqrt(rotation_matrix[2][1] ** 2 + rotation_matrix[2][2] ** 2))
-                * 180
-                / np.pi
-        )
+        yaw = -np.arctan2(-rotation_matrix[2][0], np.sqrt(rotation_matrix[2][1] ** 2 + rotation_matrix[2][2] ** 2)) * 180 / np.pi
         pitch = np.arctan2(rotation_matrix[2][1], rotation_matrix[2][2]) * 180 / np.pi
         return RPY(roll=roll, pitch=pitch, yaw=yaw), None
 
@@ -250,7 +242,12 @@ class BIWIEvaluator(HeadPoseEvaluator):
         return predictions
 
 
-def main(model_name: str = "YoloHeads_M", checkpoint: str = "ckpt_best.pth", aflw_dir: str = "g:/AFLW2000", biwi_dir: Optional[str] = None):
+def main(
+    model_name: str = "YoloHeads_L",
+    checkpoint: str = "C:\Develop\GitHub\VGG\head_detector\yolo_head_training\weights\yolo_heads_l_ckpt_best_nme_1.562.pth",
+    aflw_dir: str = "g:/AFLW2000",
+    biwi_dir: Optional[str] = None,
+):
     evaluators = [AFLWEvaluator(data_dir=aflw_dir, model_name=model_name, checkpoint=checkpoint)]
     if biwi_dir is not None:
         evaluators.append(BIWIEvaluator(data_dir=biwi_dir, model_name=model_name, checkpoint=checkpoint))
