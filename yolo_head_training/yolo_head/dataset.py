@@ -204,6 +204,7 @@ class DAD3DHeadsDataset(AbstractPoseEstimationDataset):
                 sample.bboxes_xywh = np.stack([xmin, ymin, w, h], axis=1)
                 sample.areas = area
 
+        sample = sample.sanitize_sample().filter_by_bbox_area(1)
         return sample
 
     def get_dataset_preprocessing_params(self) -> dict:
