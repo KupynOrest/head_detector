@@ -88,7 +88,7 @@ class HeadPoseEvaluator:
         # For simplicity, we do bottom and right padding to simply the calculations in post-processing
         pad_w = dsize - image.shape[1]
         pad_h = dsize - image.shape[0]
-        image = cv2.copyMakeBorder(image, 0, pad_h, 0, pad_w, cv2.BORDER_CONSTANT, value=127)
+        image = cv2.copyMakeBorder(image, pad_h // 2, pad_h - pad_h // 2, pad_w // 2, pad_w - pad_w // 2, cv2.BORDER_CONSTANT, value=127)
 
         image_input = torch.from_numpy(image).to(device).permute(2, 0, 1).unsqueeze(0).float() / 255.0
 

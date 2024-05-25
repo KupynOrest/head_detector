@@ -1,34 +1,45 @@
 import os
-import math
 import glob
 from pathlib import Path
-from typing import Union, Optional
+from typing import Union
 
-from dataclasses import dataclass
 import tqdm
 import numpy as np
 import torch
 from fire import Fire
 import cv2
 from super_gradients.training import models
-import scipy.io
-from scipy.spatial.transform import Rotation
+from head_mesh import HeadMesh
 from super_gradients.training.utils.utils import infer_model_device
-
-from yolo_head.dataset_parsing import draw_2d_keypoints
-from yolo_head.flame import FlameParams, FLAME_CONSTS, rot_mat_from_6dof
+import random
+from yolo_head.flame import FlameParams, FLAME_CONSTS
 from yolo_head.yolo_heads_predictions import YoloHeadsPredictions
-from pytorch_toolbelt.utils import vstack_header
 
 
-MAX_ROTATION = 99
-MAE_THRESHOLD = 40
+POINT_COLOR = (255, 255, 255)
+HEAD_INDICES = np.load(str("/home/okupyn/head_detector/yolo_head_training/yolo_head/flame_indices/head_indices.npy"),
+                          allow_pickle=True)[()]
 
-@dataclass
-class RPY:
-    roll: float
-    pitch: float
-    yaw: float
+
+def draw_points(image: np.ndarray, points: np.ndarray) -> np.ndarray:
+    """
+    Points are expected to have integer coordinates.
+    """
+    radius = max(1, int(min(image.shape[:2]) * 0.002))
+    for pt in points:
+        cv2.circle(image, (int(pt[0]), int(pt[1])), 1, POINT_COLOR, -1)
+    return image
+
+
+def draw_3d_landmarks(projected_vertices, image: np.ndarray, triangles) -> np.ndarray:
+    points = []
+    points.extend(np.take(projected_vertices, np.array(HEAD_INDICES), axis=0))
+    for triangle in triangles:
+        pts = [(projected_vertices[i][0], projected_vertices[i][1]) for i in triangle]
+        pts = np.array(pts, np.int32)
+        pts = pts.reshape((-1, 1, 2))
+        cv2.polylines(image, [pts], isClosed=True, color=(0, 0, 255), thickness=1)
+    return draw_points(image, points)
 
 
 def find_images_and_labels(dataset_dir):
@@ -67,7 +78,7 @@ def predict_on_image(model, image, dsize=640):
 
     image_input = torch.from_numpy(image).to(device).permute(2, 0, 1).unsqueeze(0).float() / 255.0
     raw_predictions = model(image_input)
-    (predictions,) = model.get_post_prediction_callback(conf=0.5, iou=0.5, post_nms_max_predictions=30)(raw_predictions)
+    (predictions,) = model.get_post_prediction_callback(conf=0.4, iou=0.5, post_nms_max_predictions=100)(raw_predictions)
 
     predictions: YoloHeadsPredictions = predictions
     predictions.predicted_2d_vertices /= scale # There are 565 keypoints subset here
@@ -76,14 +87,6 @@ def predict_on_image(model, image, dsize=640):
     flame = FlameParams.from_3dmm(predictions.mm_params, FLAME_CONSTS)
     flame.scale /= scale
     predictions.mm_params = flame.to_3dmm_tensor()
-    params = predictions.mm_params.numpy().tolist()
-    for i, head in enumerate(params):
-        head = head[400:406]
-        pred_pose = calculate_rpy(predictions.mm_params[i][400:406])
-        print(f"Roll {pred_pose.roll:.2f}, Pitch {pred_pose.pitch:.2f}, Yaw {pred_pose.yaw:.2f}")
-        print(["{0:0.2f}".format(i) for i in head])
-    print("============================")
-
     return predictions, flame
 
 
@@ -102,49 +105,32 @@ def limit_angle(angle: Union[int, float], pi: Union[int, float] = 180.0) -> Unio
     return angle
 
 
-def calculate_rpy(flame_params) -> RPY:
-    rot_mat = rot_mat_from_6dof(flame_params).numpy()[0]
-    rot_mat_2 = np.transpose(rot_mat)
-    angle = Rotation.from_matrix(rot_mat_2).as_euler("xyz", degrees=True)
-    roll, pitch, yaw = list(map(limit_angle, [angle[2], angle[0] - 180, angle[1]]))
-    return RPY(roll=roll, pitch=pitch, yaw=yaw)
-
-
-def get_ground_truth(pose_path: str) -> Optional[RPY]:
-    mat = scipy.io.loadmat(pose_path)
-    pose_params = mat["Pose_Para"][0]
-    degrees = pose_params[:3] * (180 / np.pi)
-    if np.any(np.abs(degrees) > MAX_ROTATION):
-        return None
-    return RPY(roll=degrees[2], pitch=degrees[0], yaw=degrees[1])
-
-
-def mae(x, y):
-    PI = 180.0
-    return min(
-        math.fabs(x - y),
-        math.fabs(x - (y - 2 * PI)),
-        math.fabs(x - (y + 2 * PI)),
-    )
-
-
-def draw_pose(rpy: RPY, image: np.ndarray) -> np.ndarray:
-    image = vstack_header(image, f"Roll: {rpy.roll:.2f}, Pitch: {rpy.pitch:.2f}, Yaw: {rpy.yaw:.2f}")
-    return image
-
-
-def main(folder: str, model_name="YoloHeads_M", checkpoint="C:/Develop/GitHub/VGG/head_detector/yolo_head_training/weights/ckpt_best.pth"):
-    images = glob.glob(f"{folder}/*")
+def main(pattern: str, model_name="YoloHeads_M", checkpoint="C:/Develop/GitHub/VGG/head_detector/yolo_head_training/weights/ckpt_best.pth"):
+    images = glob.glob(pattern)
     os.makedirs("test", exist_ok=True)
     model = models.get(model_name, checkpoint_path=checkpoint, num_classes=413).eval() # 412 is total number of flame params
     index = 0
+
+    head_mesh = HeadMesh()
+    triangles = head_mesh.flame.faces
+    filtered_triangles = []
+    for triangle in triangles:
+        keep = True
+        for v in triangle:
+            if v not in HEAD_INDICES:
+                keep = False
+        if keep:
+            filtered_triangles.append(triangle)
+    images = random.sample(images, 4000)
     for image_path in tqdm.tqdm(images):
-        print(image_path)
         image = cv2.imread(str(image_path))
         predictions, flame_params = predict_on_image(model, image)
+        if predictions.bboxes_xyxy.size()[0] == 0:
+            continue
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        image = draw_2d_keypoints(image[..., ::-1], predictions.predicted_2d_vertices.reshape(-1, 2))
-        cv2.imwrite(f"test/{index}.jpg", image)
+        for vertices_2d in predictions.predicted_2d_vertices:
+            image = draw_3d_landmarks(vertices_2d.reshape(-1, 2), image, filtered_triangles)
+        cv2.imwrite(f"test/{index}.jpg", cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
         index += 1
 
 
