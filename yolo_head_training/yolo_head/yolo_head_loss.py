@@ -443,6 +443,17 @@ class YoloHeadsLoss(nn.Module):
         else:
             raise ValueError(f"Unknown classification loss type: {self.classification_loss_type}")
 
+        if not torch.isfinite(loss_cls).all():
+            nan_scores = ~torch.isfinite(assigned_scores)
+            msg = "Classification loss is not finite\n"
+            if nan_scores.any():
+                msg += f"Assigned boxes {assign_result.assigned_bboxes[nan_scores]} with non-finite assigned scores\n"
+                msg += f"Predicted boxes {pred_bboxes[nan_scores]} with non-finite scores\n"
+                msg += f"Predicted scores {pred_scores[nan_scores]} with non-finite scores\n"
+            else:
+                msg += f"All assigned scores are finite\n"
+            raise RuntimeError(msg)
+
         assigned_scores_sum = assigned_scores.sum()
         if self.average_losses_in_ddp and is_distributed():
             torch.distributed.all_reduce(assigned_scores_sum, op=torch.distributed.ReduceOp.SUM)
@@ -575,6 +586,14 @@ class YoloHeadsLoss(nn.Module):
 
         regression_loss_reduced = regression_loss_unreduced.mean(dim=1, keepdim=False)
 
+        regression_loss_nan = ~torch.isfinite(regression_loss_reduced)
+        if regression_loss_nan.any():
+            msg = "Keypoint loss is not finite\n"
+            msg += f"Keypoint loss {regression_loss_reduced[regression_loss_nan]}\n"
+            msg += f"Assigned keypoints  {target_coords[regression_loss_nan]}\n"
+            msg += f"Predicted keypoints {predicted_coords[regression_loss_nan]}\n"
+            raise RuntimeError(msg)
+
         if assigned_scores is None:
             regression_loss = regression_loss_reduced.mean()
         else:
@@ -616,8 +635,17 @@ class YoloHeadsLoss(nn.Module):
 
             bbox_weight = torch.masked_select(assign_result.assigned_scores.sum(-1), mask_positive).unsqueeze(-1)
 
-            loss_iou = self.iou_loss(pred_bboxes_pos, assigned_bboxes_pos) * bbox_weight
-            loss_iou = loss_iou.sum() / assigned_scores_sum
+            loss_iou_non_reduced = self.iou_loss(pred_bboxes_pos, assigned_bboxes_pos) * bbox_weight
+
+            loss_iou_nans = ~torch.isfinite(loss_iou_non_reduced)
+            if loss_iou_nans.any():
+                msg = "IoU loss is not finite\n"
+                msg += f"IoU loss {loss_iou_non_reduced[loss_iou_nans]}\n"
+                msg += f"Assigned boxes {assigned_bboxes_pos[loss_iou_nans]} with non-finite assigned scores\n"
+                msg += f"Predicted boxes {pred_bboxes_pos[loss_iou_nans]} with non-finite scores\n"
+                raise RuntimeError(msg)
+
+            loss_iou = loss_iou_non_reduced.sum() / assigned_scores_sum
 
             dist_mask = mask_positive.unsqueeze(-1).tile([1, 1, (reg_max + 1) * 4])
             pred_dist_pos = torch.masked_select(pred_dist, dist_mask).reshape([-1, 4, reg_max + 1])
