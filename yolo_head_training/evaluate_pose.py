@@ -1,6 +1,7 @@
 import math
 import abc
 import glob
+import os
 from pathlib import Path
 from typing import Union, Optional, Any, Tuple
 import tqdm
@@ -13,10 +14,13 @@ import scipy.io
 from scipy.spatial.transform import Rotation
 from super_gradients.training.utils.utils import infer_model_device
 
-from yolo_head.dataset_parsing import draw_2d_keypoints
 from yolo_head.flame import FlameParams, FLAME_CONSTS, rot_mat_from_6dof, RPY
 from yolo_head.yolo_heads_predictions import YoloHeadsPredictions
-from draw_utils import draw_axis, draw_pose
+from draw_utils import draw_pose, draw_3d_landmarks, get_relative_path
+
+
+FACE_INDICES = np.load(str(get_relative_path("yolo_head/flame_indices/face.npy", __file__)),
+                          allow_pickle=True)[()]
 
 
 MAX_ROTATION = 99
@@ -42,6 +46,7 @@ class HeadPoseEvaluator:
     def __init__(self, data_dir: str, model_name: str = "YoloHeads_M", checkpoint: str = "ckpt_best.pth"):
         self.dataset_dir = data_dir
         self.model = models.get(model_name, checkpoint_path=checkpoint, num_classes=413).eval()
+        self.name = "pose"
         if torch.cuda.is_available():
             self.model = self.model.cuda()
 
@@ -72,7 +77,20 @@ class HeadPoseEvaluator:
         rot_mat_2 = np.transpose(rot_mat)
         angle = Rotation.from_matrix(rot_mat_2).as_euler("xyz", degrees=True)
         roll, pitch, yaw = list(map(limit_angle, [angle[2], angle[0] - 180, angle[1]]))
+        if np.any(np.abs([roll, pitch, yaw]) > 135):
+            print("Rotation is too large")
+            return RPY(roll=0, pitch=0, yaw=0)
         return RPY(roll=roll, pitch=pitch, yaw=yaw)
+
+    def _get_face_bbox(self, vertices):
+        points = []
+        points.extend(np.take(vertices, np.array(FACE_INDICES), axis=0))
+        points = np.array(points)
+        x = min(points[:, 0])
+        y = min(points[:, 1])
+        x1 = max(points[:, 0])
+        y1 = max(points[:, 1])
+        return list(map(int, [x, y, x1, y1]))
 
     def predict(self, image, metadata: Any, dsize: int = 640):
         device = infer_model_device(self.model)
@@ -88,18 +106,19 @@ class HeadPoseEvaluator:
         # For simplicity, we do bottom and right padding to simply the calculations in post-processing
         pad_w = dsize - image.shape[1]
         pad_h = dsize - image.shape[0]
-        image = cv2.copyMakeBorder(image, pad_h // 2, pad_h - pad_h // 2, pad_w // 2, pad_w - pad_w // 2, cv2.BORDER_CONSTANT, value=127)
+        image = cv2.copyMakeBorder(image, 0, pad_h, 0, pad_w, cv2.BORDER_CONSTANT, value=127)
 
         image_input = torch.from_numpy(image).to(device).permute(2, 0, 1).unsqueeze(0).float() / 255.0
 
         raw_predictions = self.model(image_input)
-        (predictions,) = self.model.get_post_prediction_callback(conf=0.5, iou=0.5, post_nms_max_predictions=30)(raw_predictions)
+        (predictions,) = self.model.get_post_prediction_callback(conf=0.2, iou=0.5, post_nms_max_predictions=30)(raw_predictions)
+        predictions.bboxes_xyxy /= scale
+        predictions.predicted_2d_vertices /= scale  # There are 565 keypoints subset here
+        predictions.predicted_3d_vertices /= scale  # There are 565 keypoints subset here
         if predictions.bboxes_xyxy.shape[0] > 1:
             predictions = self.select_head(predictions, metadata)
 
         predictions: YoloHeadsPredictions = predictions
-        predictions.predicted_2d_vertices /= scale  # There are 565 keypoints subset here
-        predictions.predicted_3d_vertices /= scale  # There are 565 keypoints subset here
 
         flame = FlameParams.from_3dmm(predictions.mm_params, FLAME_CONSTS)
         flame.scale /= scale
@@ -107,6 +126,7 @@ class HeadPoseEvaluator:
         return predictions, flame
 
     def __call__(self, *args, **kwargs):
+        os.makedirs(os.path.join("output", self.name), exist_ok=True)
         images, labels = self.find_images_and_labels(self.dataset_dir)
         metrics = {
             "roll": [],
@@ -114,21 +134,28 @@ class HeadPoseEvaluator:
             "yaw": [],
         }
         fail_cases = 0
+        index = -1
         for image_path, gt in tqdm.tqdm(zip(images, labels)):
-            try:
-                image = cv2.imread(str(image_path))
-                ground_truth = self.get_gt_pose(str(gt))
-                if ground_truth is None:
-                    continue
-                gt_pose, metadata = ground_truth
-                predictions, flame_params = self.predict(image, metadata)
-                pred_pose = self.calculate_rpy(flame_params)
-                metrics["roll"].append(self.mae(gt_pose.roll, pred_pose.roll))
-                metrics["pitch"].append(self.mae(gt_pose.pitch, pred_pose.pitch))
-                metrics["yaw"].append(self.mae(gt_pose.yaw, pred_pose.yaw))
-            except Exception as e:
-                fail_cases += 1
-                print(f"Failed to process {image_path}: {e}")
+            index += 1
+            image = cv2.imread(str(image_path))
+            ground_truth = self.get_gt_pose(str(gt))
+            if ground_truth is None:
+                continue
+            gt_pose, metadata = ground_truth
+            predictions, flame_params = self.predict(image, metadata)
+            pred_pose = self.calculate_rpy(flame_params)
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            gt_image = image.copy()
+            #gt_image = cv2.rectangle(gt_image, tuple(metadata[:2]), tuple(metadata[2:]), (0, 255, 0), 2)
+            bbox = self._get_face_bbox(predictions.predicted_2d_vertices[0].numpy())
+            image = draw_3d_landmarks(predictions.predicted_2d_vertices.reshape(-1, 2), image)
+            image = cv2.rectangle(image, tuple(bbox[:2]), tuple(bbox[2:]), (0, 255, 0), 2)
+            image = draw_pose(pred_pose, image)
+            gt_image = draw_pose(gt_pose, gt_image)
+            cv2.imwrite(f"output/{self.name}/{index}.jpg", cv2.cvtColor(np.hstack((image, gt_image)), cv2.COLOR_RGB2BGR))
+            metrics["roll"].append(self.mae(gt_pose.roll, pred_pose.roll))
+            metrics["pitch"].append(self.mae(gt_pose.pitch, pred_pose.pitch))
+            metrics["yaw"].append(self.mae(gt_pose.yaw, pred_pose.yaw))
         roll_mae = np.mean(np.array(metrics["roll"]))
         pitch_mae = np.mean(np.array(metrics["pitch"]))
         yaw_mae = np.mean(np.array(metrics["yaw"]))
@@ -137,6 +164,10 @@ class HeadPoseEvaluator:
 
 
 class AFLWEvaluator(HeadPoseEvaluator):
+    def __init__(self, data_dir: str, model_name: str = "YoloHeads_M", checkpoint: str = "ckpt_best.pth"):
+        super().__init__(data_dir, model_name, checkpoint)
+        self.name = "aflw"
+
     @staticmethod
     def calculate_iou(bbox1, bbox2):
         x1, y1, x2, y2 = bbox1
@@ -154,11 +185,12 @@ class AFLWEvaluator(HeadPoseEvaluator):
         Select the head with the highest confidence score.
         """
         head_bbox = metadata
-        bboxes = predictions.bboxes_xyxy
+        vertices = predictions.predicted_2d_vertices
         # select one with largest iou
         max_iou = 0
         max_index = 0
-        for index, bbox in enumerate(bboxes):
+        for index, vertices_i in enumerate(vertices):
+            bbox = self._get_face_bbox(vertices_i.numpy())
             iou = self.calculate_iou(bbox, head_bbox)
             if iou > max_iou:
                 max_iou = iou
@@ -203,6 +235,10 @@ class AFLWEvaluator(HeadPoseEvaluator):
 
 
 class BIWIEvaluator(HeadPoseEvaluator):
+    def __init__(self, data_dir: str, model_name: str = "YoloHeads_M", checkpoint: str = "ckpt_best.pth"):
+        super().__init__(data_dir, model_name, checkpoint)
+        self.name = "biwi"
+
     def find_images_and_labels(self, dataset_dir):
         images = glob.glob(f"{dataset_dir}/**/*.png")
         labels = [x.replace("rgb.png", "pose.txt") for x in images]

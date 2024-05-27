@@ -446,6 +446,10 @@ class YoloHeadsLoss(nn.Module):
 
         if not torch.isfinite(loss_cls).all():
             nan_scores = ~torch.isfinite(assigned_scores)
+            nan_scores = nan_scores.squeeze(2)  # Squeeze the extra dimension
+
+            # Ensure `nan_scores` is a boolean tensor for indexing
+            nan_scores = nan_scores.bool()
             msg = "Classification loss is not finite\n"
             if nan_scores.any():
                 msg += f"Assigned boxes {assign_result.assigned_bboxes[nan_scores.squeeze(-1)]} with non-finite assigned scores\n"

@@ -42,7 +42,7 @@ ema_params:
   decay_type: exp
   beta: 50
 
-mixed_precision: True
+mixed_precision: False
 sync_bn: False
 
 valid_metrics_list:

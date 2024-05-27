@@ -20,7 +20,7 @@ export OMP_NUM_THREADS=16
 export NCCL_DEBUG=INFO
 date +"%R starting script"
 cd /users/okupyn/head_detector/yolo_head_training || exit
-torchrun --nproc_per_node=4 train.py --config-name=yolo_heads_l_large_orest num_gpus=4 multi_gpu=DDP experiment_suffix='yolo_l_no_crop'
+torchrun --nproc_per_node=4 train.py --config-name=yolo_heads_l_large_orest num_gpus=4 multi_gpu=DDP training_hyperparams.resume=True experiment_suffix='yolo_l_no_crop'
 
 
 date +"%R slurm job done"

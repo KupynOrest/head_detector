@@ -16,6 +16,11 @@ from scipy.spatial.transform import Rotation
 from dad_utils import get_68_landmarks, calc_zn, calc_ch_dist
 from super_gradients.training import models
 from fire import Fire
+from draw_utils import draw_3d_landmarks, get_relative_path
+
+
+HEAD_INDICES = np.load(str(get_relative_path("yolo_head/flame_indices/head_indices.npy", __file__)),
+                          allow_pickle=True)[()]
 
 MeshArrays = namedtuple(
     "MeshArrays",
@@ -65,11 +70,14 @@ class HeadAnnotation:
             projection_matrix=np.array(mesh_data["projection_matrix"], dtype=np.float32),
             model_view_matrix=np.array(mesh_data["model_view_matrix"], dtype=np.float32),
         )
+        #xywh to xyxy
+        x, y, w, h = config["bbox"]
+        bbox = [x, y, x + w, y + h]
 
         return cls(
             image_path=config["img_path"],
             mesh=mesh,
-            bbox=config["bbox"],
+            bbox=bbox,
             attributes=config["attributes"],
         )
 
@@ -99,7 +107,7 @@ class PinataEvaluator:
             "pose": defaultdict(dict),
             "standard light": defaultdict(dict),
         }
-        self.metrics = {"nme_2d": [], "z_n": [], "rot_error": [], "angle_error": []}  # , "chamfer": []
+        self.metrics = {"nme_2d": [], "z_n": [], "rot_error": [], "angle_error": [], "chamfer": []}
 
     @staticmethod
     def mae(x, y):
@@ -141,7 +149,51 @@ class PinataEvaluator:
                 metric_value=metric_value,
             )
 
-    def get_predictions(self, image, dsize: int = 640):
+    def _get_face_bbox(self, vertices):
+        points = []
+        points.extend(np.take(vertices, np.array(HEAD_INDICES), axis=0))
+        points = np.array(points)
+        x = min(points[:, 0])
+        y = min(points[:, 1])
+        x1 = max(points[:, 0])
+        y1 = max(points[:, 1])
+        return list(map(int, [x, y, x1, y1]))
+
+    @staticmethod
+    def calculate_iou(bbox1, bbox2):
+        x1, y1, x2, y2 = bbox1
+        x3, y3, x4, y4 = bbox2
+        x_overlap = max(0, min(x2, x4) - max(x1, x3))
+        y_overlap = max(0, min(y2, y4) - max(y1, y3))
+        intersection = x_overlap * y_overlap
+        area1 = (x2 - x1) * (y2 - y1)
+        area2 = (x4 - x3) * (y4 - y3)
+        union = area1 + area2 - intersection
+        return intersection / union
+
+    def select_head(self, predictions, metadata):
+        """
+        Select the head with the highest confidence score.
+        """
+        head_bbox = metadata
+        vertices = predictions.predicted_2d_vertices
+        # select one with largest iou
+        max_iou = 0
+        max_index = 0
+        for index, vertices_i in enumerate(vertices):
+            bbox = self._get_face_bbox(vertices_i.numpy())
+            iou = self.calculate_iou(bbox, head_bbox)
+            if iou > max_iou:
+                max_iou = iou
+                max_index = index
+        predictions.bboxes_xyxy = predictions.bboxes_xyxy[max_index].unsqueeze(0)
+        predictions.predicted_2d_vertices = predictions.predicted_2d_vertices[max_index].unsqueeze(0)
+        predictions.predicted_3d_vertices = predictions.predicted_3d_vertices[max_index].unsqueeze(0)
+        predictions.scores = predictions.scores[max_index]
+        predictions.mm_params = predictions.mm_params[max_index].unsqueeze(0)
+        return predictions
+
+    def get_predictions(self, image, bbox, dsize: int = 640):
         device = infer_model_device(self.predictor)
         # Resize image to dsize x dsize but keep the aspect ratio by padding with zeros
         original_shape = image.shape[:2]
@@ -164,31 +216,36 @@ class PinataEvaluator:
             raw_predictions)
         if predictions.bboxes_xyxy.size()[0] == 0:
             return None, None
-        predictions.bboxes_xyxy = predictions.bboxes_xyxy[0].unsqueeze(0)
-        predictions.predicted_2d_vertices = predictions.predicted_2d_vertices[0].unsqueeze(0)
-        predictions.predicted_3d_vertices = predictions.predicted_3d_vertices[0].unsqueeze(0)
-        predictions.scores = predictions.scores[0]
-        predictions.mm_params = predictions.mm_params[0].unsqueeze(0)
+        predictions.bboxes_xyxy /= scale
+        predictions.predicted_2d_vertices /= scale  # There are 565 keypoints subset here
+        predictions.predicted_3d_vertices /= scale  # There are 565 keypoints subset here
+        if predictions.bboxes_xyxy.shape[0] > 1:
+            predictions = self.select_head(predictions, bbox)
+        else:
+            predictions.bboxes_xyxy = predictions.bboxes_xyxy[0].unsqueeze(0)
+            predictions.predicted_2d_vertices = predictions.predicted_2d_vertices[0].unsqueeze(0)
+            predictions.predicted_3d_vertices = predictions.predicted_3d_vertices[0].unsqueeze(0)
+            predictions.scores = predictions.scores[0]
+            predictions.mm_params = predictions.mm_params[0].unsqueeze(0)
         flame = FlameParams.from_3dmm(predictions.mm_params, FLAME_CONSTS)
         flame.scale /= scale
-        predictions.predicted_2d_vertices /= scale  # There are 565 keypoints subset here
-        # remove back pad_w and pad_h
-        predictions.predicted_3d_vertices /= scale  # There are 565 keypoints subset here
         predictions.mm_params = flame.to_3dmm_tensor()
         return predictions, flame
 
     def __call__(self, *args, **kwargs) -> Dict[str, float]:
-        index = 0
+        index = -1
         fail_cases = 0
         for annotation in tqdm.tqdm(self.test_samples):
             attributes = annotation.attributes
             image = self.read_img(os.path.join(self.base_path, annotation.image_path))
-            #cv2.imwrite(f"test_dad/{index}.jpg", image)
             index += 1
-            predictions, flame_params = self.get_predictions(image)
+            predictions, flame_params = self.get_predictions(image, annotation.bbox)
             if predictions is None:
                 fail_cases += 1
                 continue
+            #image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            #image = draw_3d_landmarks(predictions.predicted_2d_vertices.reshape(-1, 2), image)
+            #cv2.imwrite(f"test_dad/{index}.jpg", cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
             gt_vertices_68_2d = annotation.landmarks_68_2d(image_shape=image.shape[:2])
             rotation_mat = rot_mat_from_6dof(flame_params.rotation)[0].numpy()
             rot_180 = np.array([[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]])
@@ -205,7 +262,7 @@ class PinataEvaluator:
             # endregion
 
             # region NME Calculation
-            projected_vertices = predictions.predicted_2d_vertices
+            projected_vertices = predictions.predicted_3d_vertices
 
             landmarks_2d = get_68_landmarks(projected_vertices[0])[..., :2]
             landmarks_2d = landmarks_2d.detach().cpu().numpy()
@@ -225,7 +282,7 @@ class PinataEvaluator:
             # endregion
 
             # region z_n calculation
-            pred_vertices = predictions.predicted_2d_vertices
+            pred_vertices = predictions.predicted_3d_vertices
             pred_vertices_head = pred_vertices[:, self.head_indices]
             gt_vertices_3d = torch.from_numpy(annotation.mesh.vertices3d_world_homo[:, :3]).view(-1, 3)
             gt_vertices_3d_head = gt_vertices_3d[self.head_indices] * -1
