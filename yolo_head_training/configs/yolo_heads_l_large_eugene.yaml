@@ -15,6 +15,7 @@ experiment_suffix: ""
 experiment_name: ${hydra:runtime.choices.arch_params}_${hydra:runtime.choices.dataset_params}_${hydra:runtime.choices.training_hyperparams}_${experiment_suffix}
 
 training_hyperparams:
+  ema: True
   visualization_frequency_epochs: 1
   max_epochs: 50
 
