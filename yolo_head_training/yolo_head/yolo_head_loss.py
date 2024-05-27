@@ -56,7 +56,7 @@ def batch_pose_oks(gt_keypoints: torch.Tensor, pred_keypoints: torch.Tensor, gt_
     joints1_xy = gt_keypoints[:, :, :, 0:2].unsqueeze(2)  # [N, M1, 1, Num Joints, 2]
     joints2_xy = pred_keypoints[:, :, :, 0:2].unsqueeze(1)  # [N, 1, M2, Num Joints, 2]
 
-    d = ((joints1_xy - joints2_xy) ** 2).sum(dim=-1, keepdim=False)  # [N, M1, M2, Num Joints]
+    d = ((joints1_xy - joints2_xy) ** 2).sum(dim=-1, keepdim=False, dtype=torch.float32)  # [N, M1, M2, Num Joints]
 
     # Infer pose area from bbox area * 0.53 (COCO heuristic)
     area = (gt_bboxes_xyxy[:, :, 2] - gt_bboxes_xyxy[:, :, 0]) * (gt_bboxes_xyxy[:, :, 3] - gt_bboxes_xyxy[:, :, 1]) * 0.53  # [N, M1]
@@ -67,8 +67,8 @@ def batch_pose_oks(gt_keypoints: torch.Tensor, pred_keypoints: torch.Tensor, gt_
     oks = torch.exp(-e)  # [N, M1, M2, Num Keypoints]
 
     joints1_visiblity = gt_keypoints[:, :, :, 2].gt(0).float().unsqueeze(2)  # [N, M1, 1, Num Keypoints]
-    num_visible_joints = joints1_visiblity.sum(dim=-1, keepdim=False)  # [N, M1, M2]
-    mean_oks = (oks * joints1_visiblity).sum(dim=-1, keepdim=False) / (num_visible_joints + eps)  # [N, M1, M2]
+    num_visible_joints = joints1_visiblity.sum(dim=-1, keepdim=False, dtype=torch.float32)  # [N, M1, M2]
+    mean_oks = (oks * joints1_visiblity).sum(dim=-1, keepdim=False, dtype=torch.float32) / (num_visible_joints + eps)  # [N, M1, M2]
 
     return mean_oks
 
@@ -454,7 +454,7 @@ class YoloHeadsLoss(nn.Module):
                 msg += f"All assigned scores are finite\n"
             raise RuntimeError(msg)
 
-        assigned_scores_sum = assigned_scores.sum()
+        assigned_scores_sum = assigned_scores.sum(dtype=torch.float32)
         if self.average_losses_in_ddp and is_distributed():
             torch.distributed.all_reduce(assigned_scores_sum, op=torch.distributed.ReduceOp.SUM)
             assigned_scores_sum /= get_world_size()
@@ -645,14 +645,14 @@ class YoloHeadsLoss(nn.Module):
                 msg += f"Predicted boxes {pred_bboxes_pos[loss_iou_nans]} with non-finite scores\n"
                 raise RuntimeError(msg)
 
-            loss_iou = loss_iou_non_reduced.sum() / assigned_scores_sum
+            loss_iou = loss_iou_non_reduced.sum(dtype=torch.float32) / assigned_scores_sum
 
             dist_mask = mask_positive.unsqueeze(-1).tile([1, 1, (reg_max + 1) * 4])
             pred_dist_pos = torch.masked_select(pred_dist, dist_mask).reshape([-1, 4, reg_max + 1])
             assigned_ltrb = self._bbox2distance(anchor_points, assigned_bboxes_divided_by_stride, reg_max)
             assigned_ltrb_pos = torch.masked_select(assigned_ltrb, bbox_mask).reshape([-1, 4])
             loss_dfl = self._df_loss(pred_dist_pos, assigned_ltrb_pos) * bbox_weight
-            loss_dfl = loss_dfl.sum() / assigned_scores_sum
+            loss_dfl = loss_dfl.sum(dtype=torch.float32) / assigned_scores_sum
 
             # Do not divide poses by stride since this would skew the loss and make sigmas incorrect
             pred_flame_params = pred_flame_params[mask_positive]
@@ -743,9 +743,9 @@ class YoloHeadsLoss(nn.Module):
         loss = weight * torch.nn.functional.binary_cross_entropy_with_logits(pred_logits, label, reduction="none")
 
         if reduction == "sum":
-            loss = loss.sum()
+            loss = loss.sum(dtype=torch.float32)
         elif reduction == "mean":
-            loss = loss.mean()
+            loss = loss.mean(dtype=torch.float32)
         elif reduction == "none":
             pass
         else:
