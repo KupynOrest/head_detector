@@ -167,6 +167,7 @@ class YoloHeadsTaskAlignedAssigner(nn.Module):
         # compute iou between gt and pred bbox, [B, n, L]
         ious = batch_iou_similarity(gt_bboxes, pred_bboxes)
 
+
         # gather pred bboxes class score
         pred_scores = torch.permute(pred_scores, [0, 2, 1])
         batch_ind = torch.arange(end=batch_size, dtype=gt_labels.dtype, device=gt_labels.device).unsqueeze(-1)
@@ -447,8 +448,8 @@ class YoloHeadsLoss(nn.Module):
             nan_scores = ~torch.isfinite(assigned_scores)
             msg = "Classification loss is not finite\n"
             if nan_scores.any():
-                msg += f"Assigned boxes {assign_result.assigned_bboxes[nan_scores]} with non-finite assigned scores\n"
-                msg += f"Predicted boxes {pred_bboxes[nan_scores]} with non-finite scores\n"
+                msg += f"Assigned boxes {assign_result.assigned_bboxes[nan_scores.squeeze(-1)]} with non-finite assigned scores\n"
+                msg += f"Predicted boxes {pred_bboxes[nan_scores.squeeze(-1)]} with non-finite scores\n"
                 msg += f"Predicted scores {pred_scores[nan_scores]} with non-finite scores\n"
             else:
                 msg += f"All assigned scores are finite\n"
