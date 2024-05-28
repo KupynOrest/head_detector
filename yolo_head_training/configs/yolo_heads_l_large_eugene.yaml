@@ -39,6 +39,7 @@ dataset_params:
   train_dataloader_params:
     persistent_workers: True
     batch_size: 4
+    num_workers: 16
 
   val_dataloader_params:
     persistent_workers: True
