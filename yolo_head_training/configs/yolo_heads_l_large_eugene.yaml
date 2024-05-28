@@ -18,6 +18,8 @@ training_hyperparams:
   ema: True
   visualization_frequency_epochs: 1
   max_epochs: 50
+  mixed_precision: False
+  initial_lr: 5e-5
 
 checkpoint_params:
   # For training Yolo-NAS-S pose estimation model we use pretrained weights for Yolo-NAS-S object detection model.
@@ -36,11 +38,11 @@ dataset_params:
 
   train_dataloader_params:
     persistent_workers: True
-    batch_size: 8
+    batch_size: 4
 
   val_dataloader_params:
     persistent_workers: True
-    batch_size: 8
+    batch_size: 4
 
 
 hydra:
