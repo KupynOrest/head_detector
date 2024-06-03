@@ -71,23 +71,23 @@ class DAD3DHeadsDataset(AbstractPoseEstimationDataset):
                     A.GaussianBlur(blur_limit=(3, 7), sigma_limit=0, p=0.5),
                     A.MotionBlur(blur_limit=7, p=0.5),
                     A.Defocus(p=0.5),
-                ], p=0.3),
+                ], p=0.2),
                 A.OneOf([
                     A.GaussNoise(var_limit=(10.0, 50.0), p=0.5),
                     A.ISONoise(color_shift=(0.01, 0.05), intensity=(0.1, 0.5), p=0.5),
                     A.MultiplicativeNoise(multiplier=(0.9, 1.1), p=0.5),
                     A.IAAAdditiveGaussianNoise(p=0.5),
-                ], p=0.3),
+                ], p=0.2),
                 A.OneOf([
                     A.Downscale(scale_min=0.25, scale_max=0.75, p=0.5),
                     A.JpegCompression(quality_lower=20, quality_upper=80, p=0.5),
-                ], p=0.3),
+                ], p=0.2),
                 A.RGBShift(p=0.125),
-                A.ChannelShuffle(p=0.1),
+                A.ChannelShuffle(p=0.05),
                 A.OneOf([
                     A.ToSepia(p=0.5),
                     A.ToGray(p=0.5),
-                ], p=0.1),
+                ], p=0.05),
             ]
         )
 
@@ -221,7 +221,7 @@ class DAD3DHeadsDataset(AbstractPoseEstimationDataset):
                 sample.bboxes_xywh = np.stack([xmin, ymin, w, h], axis=1)
                 sample.areas = area
 
-        sample = sample.sanitize_sample().filter_by_bbox_area(1)
+        sample = sample.sanitize_sample().filter_by_bbox_area(9)
         return sample
 
     def get_dataset_preprocessing_params(self) -> dict:

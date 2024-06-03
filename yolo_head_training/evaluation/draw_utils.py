@@ -4,7 +4,7 @@ from math import cos, sin
 import cv2
 import numpy as np
 from pytorch_toolbelt.utils import vstack_header
-from head_mesh import HeadMesh
+from evaluation.head_mesh import HeadMesh
 
 from yolo_head.flame import RPY
 
@@ -14,7 +14,7 @@ def get_relative_path(x: str, rel_to: str) -> str:
 
 
 POINT_COLOR = (255, 255, 255)
-HEAD_INDICES = np.load(str(get_relative_path("yolo_head/flame_indices/head_indices.npy", __file__)),
+HEAD_INDICES = np.load(str(get_relative_path("../yolo_head/flame_indices/head_indices.npy", __file__)),
                           allow_pickle=True)[()]
 
 def get_triangles():

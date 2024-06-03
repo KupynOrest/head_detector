@@ -16,10 +16,10 @@ from super_gradients.training.utils.utils import infer_model_device
 
 from yolo_head.flame import FlameParams, FLAME_CONSTS, rot_mat_from_6dof, RPY
 from yolo_head.yolo_heads_predictions import YoloHeadsPredictions
-from draw_utils import draw_pose, draw_3d_landmarks, get_relative_path
+from evaluation.draw_utils import draw_pose, draw_3d_landmarks, get_relative_path
 
 
-FACE_INDICES = np.load(str(get_relative_path("yolo_head/flame_indices/face.npy", __file__)),
+FACE_INDICES = np.load(str(get_relative_path("../yolo_head/flame_indices/face.npy", __file__)),
                           allow_pickle=True)[()]
 
 
@@ -141,21 +141,25 @@ class HeadPoseEvaluator:
             ground_truth = self.get_gt_pose(str(gt))
             if ground_truth is None:
                 continue
-            gt_pose, metadata = ground_truth
-            predictions, flame_params = self.predict(image, metadata)
-            pred_pose = self.calculate_rpy(flame_params)
-            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-            gt_image = image.copy()
-            #gt_image = cv2.rectangle(gt_image, tuple(metadata[:2]), tuple(metadata[2:]), (0, 255, 0), 2)
-            bbox = self._get_face_bbox(predictions.predicted_2d_vertices[0].numpy())
-            image = draw_3d_landmarks(predictions.predicted_2d_vertices.reshape(-1, 2), image)
-            image = cv2.rectangle(image, tuple(bbox[:2]), tuple(bbox[2:]), (0, 255, 0), 2)
-            image = draw_pose(pred_pose, image)
-            gt_image = draw_pose(gt_pose, gt_image)
-            cv2.imwrite(f"output/{self.name}/{index}.jpg", cv2.cvtColor(np.hstack((image, gt_image)), cv2.COLOR_RGB2BGR))
-            metrics["roll"].append(self.mae(gt_pose.roll, pred_pose.roll))
-            metrics["pitch"].append(self.mae(gt_pose.pitch, pred_pose.pitch))
-            metrics["yaw"].append(self.mae(gt_pose.yaw, pred_pose.yaw))
+            try:
+                gt_pose, metadata = ground_truth
+                predictions, flame_params = self.predict(image, metadata)
+                pred_pose = self.calculate_rpy(flame_params)
+                #image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+                #gt_image = image.copy()
+                #gt_image = cv2.rectangle(gt_image, tuple(metadata[:2]), tuple(metadata[2:]), (0, 255, 0), 2)
+                #bbox = self._get_face_bbox(predictions.predicted_2d_vertices[0].numpy())
+                #image = draw_3d_landmarks(predictions.predicted_2d_vertices.reshape(-1, 2), image)
+                #image = cv2.rectangle(image, tuple(bbox[:2]), tuple(bbox[2:]), (0, 255, 0), 2)
+                #image = draw_pose(pred_pose, image)
+                #gt_image = draw_pose(gt_pose, gt_image)
+                #cv2.imwrite(f"output/{self.name}/{index}.jpg", cv2.cvtColor(np.hstack((image, gt_image)), cv2.COLOR_RGB2BGR))
+                metrics["roll"].append(self.mae(gt_pose.roll, pred_pose.roll))
+                metrics["pitch"].append(self.mae(gt_pose.pitch, pred_pose.pitch))
+                metrics["yaw"].append(self.mae(gt_pose.yaw, pred_pose.yaw))
+            except:
+                fail_cases += 1
+                pass
         roll_mae = np.mean(np.array(metrics["roll"]))
         pitch_mae = np.mean(np.array(metrics["pitch"]))
         yaw_mae = np.mean(np.array(metrics["yaw"]))

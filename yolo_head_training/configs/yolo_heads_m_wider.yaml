@@ -1,7 +1,7 @@
 defaults:
   - training_hyperparams: vgg_head_train_params
-  - dataset_params: vgg_head_large
-  - arch_params: yolo_heads_l_arch_params
+  - dataset_params: vgg_head_wider
+  - arch_params: yolo_heads_m_arch_params
   - checkpoint_params: default_checkpoint_params
   - _self_
   - variable_setup
@@ -14,10 +14,12 @@ num_gpus: 4
 
 training_hyperparams:
   ema: True
-  initial_lr: 5e-5
-  mixed_precision: True
-  visualization_frequency_epochs: 1
-  max_epochs: 50
+  mixed_precision: False
+  initial_lr: 5e-4
+  visualization_frequency_epochs: 10
+  max_epochs: 200
+  lr_warmup_steps: 0
+  lr_warmup_epochs: 0
 
 experiment_suffix: ""
 experiment_name: ${hydra:runtime.choices.arch_params}_${hydra:runtime.choices.dataset_params}_${experiment_suffix}
@@ -25,27 +27,27 @@ experiment_name: ${hydra:runtime.choices.arch_params}_${hydra:runtime.choices.da
 checkpoint_params:
   # For training Yolo-NAS-S pose estimation model we use pretrained weights for Yolo-NAS-S object detection model.
   # By setting strict_load: key_matching we load only those weights that match the keys of the model.
-  checkpoint_path: https://sghub.deci.ai/models/yolo_nas_l_coco.pth
+  checkpoint_path: /users/okupyn/head_detector/yolo_head_training/checkpoints/yolo_heads_m_arch_params_vgg_head_large_medium_albu_augs_full_loss/RUN_20240521_163606_472769/ckpt_best.pth
   strict_load:
     _target_: super_gradients.training.sg_trainer.StrictLoad
     value: key_matching
 
 dataset_params:
   train_dataset_params:
-    data_dir: /work/okupyn/VGGHead/large
+    data_dir: /work/okupyn/WIDER_mesh
     #crop_bbox_to_visible_keypoints: True
 
   val_dataset_params:
-    data_dir: /work/okupyn/VGGHead/large
+    data_dir: /work/okupyn/WIDER_mesh
     #crop_bbox_to_visible_keypoints: True
 
   train_dataloader_params:
     persistent_workers: True
-    batch_size: 16
+    batch_size: 8
 
   val_dataloader_params:
     persistent_workers: True
-    batch_size: 16
+    batch_size: 8
 
 
 hydra:

@@ -1,4 +1,4 @@
-<mxfile host="app.diagrams.net" modified="2024-05-26T15:44:19.696Z" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36" etag="AQGE5i55jf7glSUse8vN" version="24.4.8" type="device" pages="4">
+<mxfile host="app.diagrams.net" modified="2024-05-30T17:00:46.224Z" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36" etag="PwH7ykFoMsMveCecUUUM" version="24.4.8" type="device" pages="4">
   <diagram name="Page-1" id="c7558073-3199-34d8-9f00-42111426c3f3">
     <mxGraphModel dx="4487" dy="1175" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="826" pageHeight="1169" background="none" math="0" shadow="0">
       <root>
@@ -924,10 +924,13 @@
     </mxGraphModel>
   </diagram>
   <diagram name="Сторінка-2" id="conzil-oa1qYNilID6nw">
-    <mxGraphModel dx="1306" dy="764" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+    <mxGraphModel dx="1306" dy="763" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
+        <mxCell id="1o9hSWZCQft5sS93_Zi1-1" value="" style="shape=cube;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;darkOpacity=0.05;darkOpacity2=0.1;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;flipH=1;aspect=fixed;points=[[0,0,0,0,0],[0,0,0,0,2.5],[0,0,0,0,5],[0,0,0,10,15],[0,0,0,20,25],[0,0,0,50,0],[0,0,0,70,25],[0,0,0,100,0],[0,0,0,110,10],[0,0,0,120,20],[0,0,0,120,22.5],[1,1,0,0,0]];size=20;" vertex="1" parent="1">
+          <mxGeometry x="120" y="340" width="120" height="25" as="geometry" />
+        </mxCell>
       </root>
     </mxGraphModel>
   </diagram>

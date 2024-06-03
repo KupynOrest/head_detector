@@ -13,13 +13,13 @@ from super_gradients.training.utils.utils import infer_model_device
 
 from scipy.spatial.transform import Rotation
 
-from dad_utils import get_68_landmarks, calc_zn, calc_ch_dist
+from evaluation.dad_utils import get_68_landmarks, calc_zn, calc_ch_dist
 from super_gradients.training import models
 from fire import Fire
-from draw_utils import draw_3d_landmarks, get_relative_path
+from evaluation.draw_utils import draw_3d_landmarks, get_relative_path
 
 
-HEAD_INDICES = np.load(str(get_relative_path("yolo_head/flame_indices/head_indices.npy", __file__)),
+HEAD_INDICES = np.load(str(get_relative_path("../yolo_head/flame_indices/head_indices.npy", __file__)),
                           allow_pickle=True)[()]
 
 MeshArrays = namedtuple(

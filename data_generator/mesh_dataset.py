@@ -14,6 +14,25 @@ from dad_3d_heads.predictor import FaceMeshPredictor
 from binary_detector import HeadDetector
 
 
+class HeadInfo:
+    def __init__(self, x1, y1, w, h, blur, expression, illumination, invalid, occlusion, pose):
+        self.x1 = x1
+        self.y1 = y1
+        self.w = w
+        self.h = h
+        self.blur = blur
+        self.expression = expression
+        self.illumination = illumination
+        self.invalid = invalid
+        self.occlusion = occlusion
+        self.pose = pose
+
+    def __repr__(self):
+        return (f"HeadInfo(x1={self.x1}, y1={self.y1}, w={self.w}, h={self.h}, blur={self.blur}, "
+                f"expression={self.expression}, illumination={self.illumination}, invalid={self.invalid}, "
+                f"occlusion={self.occlusion}, pose={self.pose})")
+
+
 class MeshDatasetCreator:
     def __init__(self, image_folder: str, save_path: str):
         self.predictor = FaceMeshPredictor.dad_3dnet()
@@ -40,14 +59,17 @@ class MeshDatasetCreator:
             bboxes = self._get_bboxes(item=item, image=image)
             mesh_annotations = []
             for bbox in bboxes:
-                x, y, w, h = ensure_bbox_boundaries(extend_bbox(np.array(bbox), 0.1), image.shape[:2])
-                cropped_img = image[y: y + h, x: x + w]
-                result = self.predictor(cropped_img)
-                mesh_annotations.append({
-                    "bbox": bbox,
-                    "extended_bbox": [int(x), int(y), int(w), int(h)],
-                    "3dmm_params": result["3dmm_params"].cpu().numpy()
-                })
+                try:
+                    x, y, w, h = ensure_bbox_boundaries(extend_bbox(np.array(bbox), 0.25), image.shape[:2])
+                    cropped_img = image[y: y + h, x: x + w]
+                    result = self.predictor(cropped_img)
+                    mesh_annotations.append({
+                        "bbox": bbox,
+                        "extended_bbox": [int(x), int(y), int(w), int(h)],
+                        "3dmm_params": result["3dmm_params"].cpu().numpy()
+                    })
+                except:
+                    pass
             if len(mesh_annotations) > 0:
                 stacked_annotations = {key: np.stack([d[key] for d in mesh_annotations]) for key in
                                        mesh_annotations[0].keys()}
@@ -88,6 +110,50 @@ class MeshDatasetFromCOCO(MeshDatasetCreator):
                     os.path.join(self.save_path, "train_annotations.json"))
         shutil.copy(self.coco_path.replace("coco.json", "val_annotations.json"),
                     os.path.join(self.save_path, "val_annotations.json"))
+
+
+class MeshDatasetFromWIDER(MeshDatasetCreator):
+    def __init__(self, image_folder: str, save_path: str, wider_path: str):
+        super().__init__(image_folder=image_folder, save_path=save_path)
+        self.data = self._load_wider(wider_path)
+
+    @staticmethod
+    def _load_wider(file_path: str):
+        annotations = {}
+        with open(file_path, 'r') as file:
+            lines = file.readlines()
+        i = 0
+        while i < len(lines):
+            filename = lines[i].strip()
+            num_boxes = int(lines[i + 1].strip())
+            head_infos = []
+            for j in range(num_boxes):
+                bbox_data = list(map(int, lines[i+2+j].strip().split()))
+                head_info = HeadInfo(*bbox_data)
+                head_infos.append(head_info)
+
+            annotations[filename] = head_infos
+            if num_boxes == 0:
+                i += 3
+            else:
+                i += 2 + num_boxes
+        return annotations
+
+    def _get_list_of_items(self):
+        items = self.data.items()
+        return items
+
+    def _get_image(self, item) -> Tuple[np.ndarray, str]:
+        image_name, head_infos = item
+        image_path = os.path.join(self.image_folder, image_name)
+        image = cv2.imread(image_path)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        return image, os.path.basename(image_path)
+
+    def _get_bboxes(self, item, image):
+        image_name, head_infos = item
+        bboxes = [[head.x1, head.y1, head.w, head.h] for head in head_infos]
+        return bboxes
 
 
 class MeshDatasetFromImages(MeshDatasetCreator):
@@ -154,9 +220,19 @@ def ensure_bbox_boundaries(bbox: np.array, img_shape: Tuple[int, int]) -> np.arr
     return np.array([x1, y1, w, h]).astype("int32")
 
 
-def create_dataset(image_folder: str, coco_path: str, save_path: str):
-    annotations_generator = MeshDatasetFromCOCO(image_folder=image_folder, save_path=save_path, coco_path=coco_path)
-    annotations_generator.process_dataset()
+def create_dataset(image_folder: str, wider_path: str, save_path: str):
+    dataset_creator = MeshDatasetFromWIDER(
+        image_folder=os.path.join(image_folder, "WIDER_train/images"),
+        save_path=os.path.join(save_path, "train"),
+        wider_path=os.path.join(wider_path, "wider_face_split/wider_face_train_bbx_gt.txt")
+    )
+    dataset_creator.process_dataset()
+    dataset_creator = MeshDatasetFromWIDER(
+        image_folder=os.path.join(image_folder, "WIDER_val/images"),
+        save_path=os.path.join(save_path, "valid"),
+        wider_path=os.path.join(wider_path, "wider_face_split/wider_face_val_bbx_gt.txt")
+    )
+    dataset_creator.process_dataset()
 
 
 if __name__ == '__main__':

@@ -11,14 +11,16 @@ import cv2
 from super_gradients.training import models
 from super_gradients.training.utils.utils import infer_model_device
 
+from scipy.spatial.transform import Rotation
+from yolo_head.flame import FlameParams, FLAME_CONSTS, rot_mat_from_6dof, RPY
 from draw_utils import get_relative_path
 
 
-FACE_INDICES = np.load(str(get_relative_path("yolo_head/flame_indices/face.npy", __file__)),
+FACE_INDICES = np.load(str(get_relative_path("../yolo_head/flame_indices/face.npy", __file__)),
                           allow_pickle=True)[()]
 
 
-MAX_ROTATION = 99
+MAX_ROTATION = 110
 MAE_THRESHOLD = 40
 
 
@@ -93,13 +95,30 @@ class FDDBEvaluator:
         predictions.bboxes_xyxy /= scale
         predictions.predicted_2d_vertices /= scale  # There are 565 keypoints subset here
         predictions.predicted_3d_vertices /= scale  # There are 565 keypoints subset here
-        predictions = self.parse_predictions(predictions)
+        predictions = self.parse_predictions(predictions, image)
         return predictions
 
-    def parse_predictions(self, predictions):
+    @staticmethod
+    def calculate_rpy(flame_params) -> RPY:
+        rot_mat = rot_mat_from_6dof(flame_params.rotation).numpy()[0]
+        rot_mat_2 = np.transpose(rot_mat)
+        angle = Rotation.from_matrix(rot_mat_2).as_euler("xyz", degrees=True)
+        roll, pitch, yaw = list(map(limit_angle, [angle[2], angle[0] - 180, angle[1]]))
+        return RPY(roll=roll, pitch=pitch, yaw=yaw)
+
+    @staticmethod
+    def _valid_vertices(vertices, image_shape):
+        return np.sum((vertices[:, 0] >= 0) & (vertices[:, 0] < image_shape[1]) & (vertices[:, 1] >= 0) & (vertices[:, 1] < image_shape[0])) > 0.5 * len(vertices)
+
+    def parse_predictions(self, predictions, image):
         bboxes = []
-        vertices = predictions.predicted_2d_vertices
-        for index, vertices_i in enumerate(vertices):
+        for index, (vertices_i, params) in enumerate(zip(predictions.predicted_2d_vertices, predictions.mm_params)):
+            flame = FlameParams.from_3dmm(params.unsqueeze(0), FLAME_CONSTS)
+            if not self._valid_vertices(vertices_i.numpy(), image.shape[:2]):
+                continue
+            pred_pose = self.calculate_rpy(flame)
+            if abs(pred_pose.yaw) > MAX_ROTATION or (abs(pred_pose.roll) > MAX_ROTATION and abs(pred_pose.pitch) > MAX_ROTATION):
+                continue
             bbox = self._get_face_bbox(vertices_i.numpy())
             score = float(predictions.scores[index])
             bboxes.append([*bbox, score])
@@ -156,12 +175,16 @@ class FDDBEvaluator:
         return gt_coco_format, pred_coco_format
 
     def sanitize_predictions(self, bboxes, image):
+        cropped_boxes = []
         for bbox in bboxes:
-            bbox[0] = max(0, bbox[0])
-            bbox[1] = max(0, bbox[1])
-            bbox[2] = min(image.shape[1], bbox[2])
-            bbox[3] = min(image.shape[0], bbox[3])
-        return bboxes
+            x1, y1, w, h, score = bbox
+            x1_new, y1_new = min(max(0, x1), image.shape[1]), min(max(0, y1), image.shape[0])
+            w = w - (x1_new - x1)
+            h = h - (y1_new - y1)
+            x2, y2 = min(max(0, x1_new + w), image.shape[1]), min(max(0, y1_new + h), image.shape[0])
+            w, h = x2 - x1_new, y2 - y1_new
+            cropped_boxes.append([x1_new, y1_new, w, h, score])
+        return cropped_boxes
 
     def __call__(self, *args, **kwargs):
         result = {}
