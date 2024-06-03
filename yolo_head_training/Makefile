@@ -56,7 +56,26 @@ yolo_heads_l_small_eugene:
 	python train.py --config-name=yolo_heads_l_small_eugene \
     dataset_params.train_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/small \
     dataset_params.val_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/small \
+    training_hyperparams=only_2d_keypoints \
+    num_gpus=4 multi_gpu=DDP training_hyperparams.resume=True
+
+	python train.py --config-name=yolo_heads_l_small_eugene \
+    dataset_params.train_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/small \
+    dataset_params.val_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/small \
+    training_hyperparams=only_2d_and_3d_keypoints \
     num_gpus=4 multi_gpu=DDP
+
+	python train.py --config-name=yolo_heads_l_small_eugene \
+    dataset_params.train_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/small \
+    dataset_params.val_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/small \
+    training_hyperparams=vgg_head_train_params \
+    num_gpus=4 multi_gpu=DDP training_hyperparams.resume=True
+
+	python train.py --config-name=yolo_heads_l_small_with_rescale_eugene \
+    dataset_params.train_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/small \
+    dataset_params.val_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/small \
+    num_gpus=4 multi_gpu=DDP
+
 
 yolo_heads_m_small_eugene_grid_search:
 	python train.py --config-name=yolo_heads_m_small_eugene \
@@ -64,14 +83,41 @@ yolo_heads_m_small_eugene_grid_search:
     dataset_params.train_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/small \
     dataset_params.val_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/small \
     num_gpus=4 multi_gpu=DDP
+
 	python train.py --config-name=yolo_heads_m_small_eugene \
     training_hyperparams=only_2d_keypoints \
     dataset_params.train_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/small \
     dataset_params.val_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/small \
     num_gpus=4 multi_gpu=DDP
 
+	python train.py --config-name=yolo_heads_m_small_eugene \
+    training_hyperparams=only_2d_and_3d_keypoints \
+    dataset_params.train_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/small \
+    dataset_params.val_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/small \
+    num_gpus=4 multi_gpu=DDP training_hyperparams.resume=True
+
+remaining_grid_search_m:
+	python train.py --config-name=yolo_heads_m_small_eugene \
+    training_hyperparams=only_2d_and_rpy \
+    dataset_params.train_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/small \
+    dataset_params.val_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/small \
+    num_gpus=4 multi_gpu=DDP
+
+remaining_grid_search_l:
+	python train.py --config-name=yolo_heads_l_small_eugene \
+    training_hyperparams=only_2d_and_rpy \
+    dataset_params.train_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/small \
+    dataset_params.val_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/small \
+    num_gpus=4 multi_gpu=DDP
+
 yolo_heads_l_large_eugene:
-	python train.py --config-name=yolo_heads_l_large_eugene \
+	torchrun --standalone --nnodes=1 --nproc_per_node=4 train.py --config-name=yolo_heads_l_large_eugene \
     dataset_params.train_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/large \
     dataset_params.val_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/large \
+    num_gpus=4 multi_gpu=DDP training_hyperparams.resume=True
+
+segformer_yolo_heads_m_small_eugene:
+	python train.py --config-name=segformer_yolo_heads_m_small_eugene \
+    dataset_params.train_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/small \
+    dataset_params.val_dataset_params.data_dir=/home/bloodaxe/data/VGGHead/small \
     num_gpus=4 multi_gpu=DDP
