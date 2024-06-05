@@ -5,15 +5,16 @@ from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
 import numpy as np
 import json
-import torch
 from fire import Fire
 import cv2
-from super_gradients.training import models
-from super_gradients.training.utils.utils import infer_model_device
-
-from scipy.spatial.transform import Rotation
-from yolo_head.flame import FlameParams, FLAME_CONSTS, rot_mat_from_6dof, RPY
 from draw_utils import get_relative_path
+from PIL import Image
+from torchvision import transforms
+
+import sys
+sys.path.append("/users/okupyn/img2pose")
+from img2pose import img2poseModel
+from model_loader import load_model
 
 
 FACE_INDICES = np.load(str(get_relative_path("../yolo_head/flame_indices/face.npy", __file__)),
@@ -40,12 +41,28 @@ def limit_angle(angle: Union[int, float], pi: Union[int, float] = 180.0) -> Unio
 
 
 class FDDBEvaluator:
-    def __init__(self, data_dir: str, model_name: str = "YoloHeads_M", checkpoint: str = "ckpt_best.pth"):
+    def __init__(self, data_dir: str):
         self.dataset_dir = data_dir
-        self.model = models.get(model_name, checkpoint_path=checkpoint, num_classes=413).eval()
-        if torch.cuda.is_available():
-            self.model = self.model.cuda()
+        threed_68_points = np.load("/users/okupyn/img2pose/pose_references/reference_3d_68_points_trans.npy")
+        self.pose_mean = np.load("/work/okupyn/WIDER/WIDER_train_pose_mean_v1.npy")
+        self.pose_stddev = np.load("/work/okupyn/WIDER/WIDER_train_pose_stddev_v1.npy")
+        self.model = img2poseModel(
+            18,
+            400,
+            1400,
+            pose_mean=self.pose_mean,
+            pose_stddev=self.pose_stddev,
+            threed_68_points=threed_68_points,
+        )
+        load_model(
+            self.model.fpn_model,
+            "/work/okupyn/img2pose_v1.pth",
+            cpu_mode=str(self.model.device) == "cpu",
+            model_only=True,
+        )
+        self.model.evaluate()
         self.annotations = self.read_annotations()
+        self.transform = transforms.Compose([transforms.ToTensor()])
 
     def read_annotations(self):
         with open(os.path.join(self.dataset_dir, "label.txt"), 'r') as f:
@@ -63,70 +80,16 @@ class FDDBEvaluator:
 
         return annotations
 
-    def _get_face_bbox(self, vertices):
-        points = []
-        points.extend(np.take(vertices, np.array(FACE_INDICES), axis=0))
-        points = np.array(points)
-        x = min(points[:, 0])
-        y = min(points[:, 1])
-        x1 = max(points[:, 0])
-        y1 = max(points[:, 1])
-        return list(map(int, [x, y, x1 - x, y1 - y]))
-
     def predict(self, image, dsize: int = 640):
-        device = infer_model_device(self.model)
-        # Resize image to dsize x dsize but keep the aspect ratio by padding with zeros
-        original_shape = image.shape[:2]
-        # resize to dsize max side
-        scale = dsize / max(original_shape)
-        new_shape = (int(original_shape[1] * scale), int(original_shape[0] * scale))
-        image = cv2.resize(image, new_shape)
-
-        # Pad the image with zeros
-        # For simplicity, we do bottom and right padding to simply the calculations in post-processing
-        pad_w = dsize - image.shape[1]
-        pad_h = dsize - image.shape[0]
-        image = cv2.copyMakeBorder(image, 0, pad_h, 0, pad_w, cv2.BORDER_CONSTANT, value=127)
-
-        image_input = torch.from_numpy(image).to(device).permute(2, 0, 1).unsqueeze(0).float() / 255.0
-
-        raw_predictions = self.model(image_input)
-        (predictions,) = self.model.get_post_prediction_callback(conf=0.01, iou=0.5, post_nms_max_predictions=1000)(raw_predictions)
-        predictions.bboxes_xyxy /= scale
-        predictions.predicted_2d_vertices /= scale  # There are 565 keypoints subset here
-        predictions.predicted_3d_vertices /= scale  # There are 565 keypoints subset here
-        predictions = self.parse_predictions(predictions, image)
-        return predictions
-
-    @staticmethod
-    def calculate_rpy(flame_params) -> RPY:
-        rot_mat = rot_mat_from_6dof(flame_params.rotation).numpy()[0]
-        rot_mat_2 = np.transpose(rot_mat)
-        angle = Rotation.from_matrix(rot_mat_2).as_euler("xyz", degrees=True)
-        roll, pitch, yaw = list(map(limit_angle, [angle[2], angle[0] - 180, angle[1]]))
-        return RPY(roll=roll, pitch=pitch, yaw=yaw)
-
-    @staticmethod
-    def _valid_vertices(vertices, image_shape):
-        return np.sum((vertices[:, 0] >= 0) & (vertices[:, 0] < image_shape[1]) & (vertices[:, 1] >= 0) & (vertices[:, 1] < image_shape[0])) > 0.5 * len(vertices)
-
-    def parse_predictions(self, predictions, image):
+        faces = self.model.predict([self.transform(Image.fromarray(image))])
+        faces = faces[0]
         bboxes = []
-        for index, bbox in enumerate(predictions.bboxes_xyxy):
-            bbox = bbox.cpu().numpy()
-            x1, y1, x2, y2 = list(map(int, bbox))
-            score = float(predictions.scores[index])
-            bboxes.append([x1, y1, x2 - x1, y2 - y1, score])
-        #for index, (vertices_i, params) in enumerate(zip(predictions.predicted_2d_vertices, predictions.mm_params)):
-        #    flame = FlameParams.from_3dmm(params.unsqueeze(0), FLAME_CONSTS)
-        #    if not self._valid_vertices(vertices_i.numpy(), image.shape[:2]):
-        #        continue
-        #    pred_pose = self.calculate_rpy(flame)
-        #    if abs(pred_pose.yaw) > MAX_ROTATION or (abs(pred_pose.roll) > MAX_ROTATION and abs(pred_pose.pitch) > MAX_ROTATION):
-        #        continue
-        #    bbox = self._get_face_bbox(vertices_i.numpy())
-        #    score = float(predictions.scores[index])
-        #    bboxes.append([*bbox, score])
+        for i in range(len(faces["scores"])):
+            bbox = list(map(int, faces["boxes"].cpu().numpy()[i]))
+            score = faces["scores"].cpu().numpy()[i]
+            x1, y1, x2, y2 = bbox[0], bbox[1], bbox[2], bbox[3]
+            confidence = float(score)
+            bboxes.append([x1, y1, x2 - x1, y2 - y1, confidence])
         return bboxes
 
     def convert_to_coco_format(self, gt_dict, pred_dict):
@@ -179,29 +142,16 @@ class FDDBEvaluator:
 
         return gt_coco_format, pred_coco_format
 
-    def sanitize_predictions(self, bboxes, image):
-        cropped_boxes = []
-        for bbox in bboxes:
-            x1, y1, w, h, score = bbox
-            x1_new, y1_new = min(max(0, x1), image.shape[1]), min(max(0, y1), image.shape[0])
-            w = w - (x1_new - x1)
-            h = h - (y1_new - y1)
-            x2, y2 = min(max(0, x1_new + w), image.shape[1]), min(max(0, y1_new + h), image.shape[0])
-            w, h = x2 - x1_new, y2 - y1_new
-            cropped_boxes.append([x1_new, y1_new, w, h, score])
-        return cropped_boxes
-
     def __call__(self, *args, **kwargs):
         result = {}
         index = -1
-        os.makedirs("fddb_test", exist_ok=True)
         for image_path, bboxes in tqdm.tqdm(self.annotations.items()):
             index += 1
             image = cv2.imread(os.path.join(self.dataset_dir, "images", image_path))
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
             predictions = self.predict(image)
-            predictions = self.sanitize_predictions(predictions, image)
             result[image_path] = predictions
-            #gt_image = image.copy()
+            gt_image = image.copy()
             #for bbox in bboxes:
             #    x, y, w, h = bbox
             #    cv2.rectangle(gt_image, (x, y), (x + w, y + h), (0, 0, 255), 2)
@@ -209,8 +159,7 @@ class FDDBEvaluator:
             #    x, y, w, h, score = bbox
             #    cv2.rectangle(image, (x, y), (x + w, y + h), (0, 0, 255), 2)
             #    cv2.putText(image, str(round(score, 2)), (x - 3, y - 3), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-            #cv2.imwrite(f"fddb_test/{index}_pred.jpg", image)
-            #cv2.imwrite(f"fddb_test/{index}_gt.jpg", gt_image)
+            #cv2.imwrite(f"fddb_test/{index}.jpg", np.hstack((gt_image, image)))
         gt_coco_format, pred_coco_format = self.convert_to_coco_format(self.annotations, result)
 
         # Save the ground truth and predictions in json files
@@ -235,11 +184,9 @@ class FDDBEvaluator:
 
 
 def main(
-    model_name: str = "YoloHeads_L",
-    checkpoint: str = "C:\Develop\GitHub\VGG\head_detector\yolo_head_training\weights\yolo_heads_l_ckpt_best_nme_1.562.pth",
     fddb_path: str = "/work/okupyn/FDDB",
 ):
-    evaluator = FDDBEvaluator(data_dir=fddb_path, model_name=model_name, checkpoint=checkpoint)
+    evaluator = FDDBEvaluator(data_dir=fddb_path)
     evaluator()
 
 

@@ -4,12 +4,11 @@ import json
 from annoy import AnnoyIndex
 from glob import glob
 from tqdm import tqdm
-import cv2
 from fire import Fire
 from deepface import DeepFace
 
 
-EMBEDDING_SIZE = 4096
+EMBEDDING_SIZE = 512
 
 
 def build_face_index(image_folder: str, save_path: str, num_trees: int = 10):
@@ -21,7 +20,7 @@ def build_face_index(image_folder: str, save_path: str, num_trees: int = 10):
     #images = glob(f"{image_folder}/*.jpg", recursive=True)
     for image_path in tqdm(images):
         try:
-            embedding_objs = DeepFace.represent(img_path=image_path, model_name="DeepFace", enforce_detection=False)
+            embedding_objs = DeepFace.represent(img_path=image_path, model_name="ArcFace", enforce_detection=False)
             for embedding_obj in embedding_objs:
                 if embedding_obj["face_confidence"] < 0.4:
                     continue

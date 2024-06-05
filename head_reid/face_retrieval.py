@@ -28,10 +28,10 @@ class FaceRetrieval:
 
     def retrieve(self, image_path: str, num_results: int = 5) -> List[Optional[FaceVerificationResult]]:
         result = []
-        embedding_objs = DeepFace.represent(img_path=image_path, model_name="DeepFace", enforce_detection=False)
+        embedding_objs = DeepFace.represent(img_path=image_path, model_name="ArcFace", enforce_detection=False)
         for embedding_obj in embedding_objs:
             embedding = embedding_obj["embedding"]
-            if embedding_obj["face_confidence"] < 0.4:
+            if embedding_obj["face_confidence"] < 0.8:
                 result.append(None)
                 continue
             embedding_result = []

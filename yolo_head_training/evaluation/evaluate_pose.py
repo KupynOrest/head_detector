@@ -141,25 +141,22 @@ class HeadPoseEvaluator:
             ground_truth = self.get_gt_pose(str(gt))
             if ground_truth is None:
                 continue
-            try:
-                gt_pose, metadata = ground_truth
-                predictions, flame_params = self.predict(image, metadata)
-                pred_pose = self.calculate_rpy(flame_params)
-                #image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-                #gt_image = image.copy()
-                #gt_image = cv2.rectangle(gt_image, tuple(metadata[:2]), tuple(metadata[2:]), (0, 255, 0), 2)
-                #bbox = self._get_face_bbox(predictions.predicted_2d_vertices[0].numpy())
-                #image = draw_3d_landmarks(predictions.predicted_2d_vertices.reshape(-1, 2), image)
-                #image = cv2.rectangle(image, tuple(bbox[:2]), tuple(bbox[2:]), (0, 255, 0), 2)
-                #image = draw_pose(pred_pose, image)
-                #gt_image = draw_pose(gt_pose, gt_image)
-                #cv2.imwrite(f"output/{self.name}/{index}.jpg", cv2.cvtColor(np.hstack((image, gt_image)), cv2.COLOR_RGB2BGR))
-                metrics["roll"].append(self.mae(gt_pose.roll, pred_pose.roll))
-                metrics["pitch"].append(self.mae(gt_pose.pitch, pred_pose.pitch))
-                metrics["yaw"].append(self.mae(gt_pose.yaw, pred_pose.yaw))
-            except:
-                fail_cases += 1
-                pass
+            gt_pose, metadata = ground_truth
+            predictions, flame_params = self.predict(image, metadata)
+            pred_pose = self.calculate_rpy(flame_params)
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            gt_image = image.copy()
+            #gt_image = cv2.rectangle(gt_image, tuple(metadata[:2]), tuple(metadata[2:]), (0, 255, 0), 2)
+            #bbox = self._get_face_bbox(predictions.predicted_2d_vertices[0].numpy())
+            image = draw_3d_landmarks(predictions.predicted_2d_vertices.reshape(-1, 2), image)
+            #image = cv2.rectangle(image, tuple(bbox[:2]), tuple(bbox[2:]), (0, 255, 0), 2)
+            image = draw_pose(pred_pose, image)
+            gt_image = draw_pose(gt_pose, gt_image)
+            cv2.imwrite(f"output/{self.name}/{index}_pred.jpg", cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
+            cv2.imwrite(f"output/{self.name}/{index}_gt.jpg", cv2.cvtColor(gt_image, cv2.COLOR_RGB2BGR))
+            metrics["roll"].append(self.mae(gt_pose.roll, pred_pose.roll))
+            metrics["pitch"].append(self.mae(gt_pose.pitch, pred_pose.pitch))
+            metrics["yaw"].append(self.mae(gt_pose.yaw, pred_pose.yaw))
         roll_mae = np.mean(np.array(metrics["roll"]))
         pitch_mae = np.mean(np.array(metrics["pitch"]))
         yaw_mae = np.mean(np.array(metrics["yaw"]))
@@ -291,7 +288,7 @@ def main(
     evaluators = [AFLWEvaluator(data_dir=aflw_dir, model_name=model_name, checkpoint=checkpoint)]
     if biwi_dir is not None:
         evaluators.append(BIWIEvaluator(data_dir=biwi_dir, model_name=model_name, checkpoint=checkpoint))
-    for evaluator in evaluators:
+    for evaluator in evaluators[1:]:
         evaluator()
 
 

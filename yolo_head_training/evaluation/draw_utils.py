@@ -90,5 +90,5 @@ def draw_axis(img, yaw, pitch, roll, tdx=None, tdy=None, size = 50):
 
 def draw_pose(rpy: RPY, image: np.ndarray) -> np.ndarray:
     image = draw_axis(image, rpy.yaw, rpy.pitch, rpy.roll)
-    image = vstack_header(image, f"R: {rpy.roll:.2f}, P: {rpy.pitch:.2f}, Y: {rpy.yaw:.2f}")
+    #image = vstack_header(image, f"R: {rpy.roll:.2f}, P: {rpy.pitch:.2f}, Y: {rpy.yaw:.2f}")
     return image

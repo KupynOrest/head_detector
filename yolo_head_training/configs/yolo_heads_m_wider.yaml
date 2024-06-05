@@ -15,11 +15,11 @@ num_gpus: 4
 training_hyperparams:
   ema: True
   mixed_precision: False
-  initial_lr: 5e-4
+  initial_lr: 5e-5
   visualization_frequency_epochs: 10
   max_epochs: 200
-  lr_warmup_steps: 0
-  lr_warmup_epochs: 0
+  lr_warmup_steps: 128
+  lr_warmup_epochs: 1
 
 experiment_suffix: ""
 experiment_name: ${hydra:runtime.choices.arch_params}_${hydra:runtime.choices.dataset_params}_${experiment_suffix}
@@ -27,7 +27,7 @@ experiment_name: ${hydra:runtime.choices.arch_params}_${hydra:runtime.choices.da
 checkpoint_params:
   # For training Yolo-NAS-S pose estimation model we use pretrained weights for Yolo-NAS-S object detection model.
   # By setting strict_load: key_matching we load only those weights that match the keys of the model.
-  checkpoint_path: /users/okupyn/head_detector/yolo_head_training/checkpoints/yolo_heads_m_arch_params_vgg_head_large_medium_albu_augs_full_loss/RUN_20240521_163606_472769/ckpt_best.pth
+  checkpoint_path: https://sghub.deci.ai/models/yolo_nas_m_coco.pth
   strict_load:
     _target_: super_gradients.training.sg_trainer.StrictLoad
     value: key_matching
