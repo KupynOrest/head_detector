@@ -91,7 +91,7 @@ class FDDBEvaluator:
         image_input = torch.from_numpy(image).to(device).permute(2, 0, 1).unsqueeze(0).float() / 255.0
 
         raw_predictions = self.model(image_input)
-        (predictions,) = self.model.get_post_prediction_callback(conf=0.01, iou=0.5, post_nms_max_predictions=1000)(raw_predictions)
+        (predictions,) = self.model.get_post_prediction_callback(conf=0.5, iou=0.5, post_nms_max_predictions=500)(raw_predictions)
         predictions.bboxes_xyxy /= scale
         predictions.predicted_2d_vertices /= scale  # There are 565 keypoints subset here
         predictions.predicted_3d_vertices /= scale  # There are 565 keypoints subset here

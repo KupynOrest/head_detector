@@ -111,7 +111,10 @@ class HeadPoseEvaluator:
         image_input = torch.from_numpy(image).to(device).permute(2, 0, 1).unsqueeze(0).float() / 255.0
 
         raw_predictions = self.model(image_input)
-        (predictions,) = self.model.get_post_prediction_callback(conf=0.2, iou=0.5, post_nms_max_predictions=30)(raw_predictions)
+        (predictions,) = self.model.get_post_prediction_callback(conf=0.5, iou=0.5, post_nms_max_predictions=30)(raw_predictions)
+        if predictions.bboxes_xyxy.size()[0] == 0:
+            (predictions,) = self.model.get_post_prediction_callback(conf=0.1, iou=0.5, post_nms_max_predictions=30)(
+                raw_predictions)
         predictions.bboxes_xyxy /= scale
         predictions.predicted_2d_vertices /= scale  # There are 565 keypoints subset here
         predictions.predicted_3d_vertices /= scale  # There are 565 keypoints subset here
@@ -141,19 +144,24 @@ class HeadPoseEvaluator:
             ground_truth = self.get_gt_pose(str(gt))
             if ground_truth is None:
                 continue
-            gt_pose, metadata = ground_truth
-            predictions, flame_params = self.predict(image, metadata)
-            pred_pose = self.calculate_rpy(flame_params)
-            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-            gt_image = image.copy()
-            #gt_image = cv2.rectangle(gt_image, tuple(metadata[:2]), tuple(metadata[2:]), (0, 255, 0), 2)
-            #bbox = self._get_face_bbox(predictions.predicted_2d_vertices[0].numpy())
-            image = draw_3d_landmarks(predictions.predicted_2d_vertices.reshape(-1, 2), image)
-            #image = cv2.rectangle(image, tuple(bbox[:2]), tuple(bbox[2:]), (0, 255, 0), 2)
-            image = draw_pose(pred_pose, image)
-            gt_image = draw_pose(gt_pose, gt_image)
-            cv2.imwrite(f"output/{self.name}/{index}_pred.jpg", cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
-            cv2.imwrite(f"output/{self.name}/{index}_gt.jpg", cv2.cvtColor(gt_image, cv2.COLOR_RGB2BGR))
+            try:
+                gt_pose, metadata = ground_truth
+                predictions, flame_params = self.predict(image, metadata)
+                pred_pose = self.calculate_rpy(flame_params)
+                #image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+                #gt_image = image.copy()
+                #gt_image = cv2.rectangle(gt_image, tuple(metadata[:2]), tuple(metadata[2:]), (0, 255, 0), 2)
+                #bbox = self._get_face_bbox(predictions.predicted_2d_vertices[0].numpy())
+                #image = draw_3d_landmarks(predictions.predicted_2d_vertices.reshape(-1, 2), image)
+                #image = cv2.rectangle(image, tuple(bbox[:2]), tuple(bbox[2:]), (0, 255, 0), 2)
+                #image = draw_pose(pred_pose, image)
+                #gt_image = draw_pose(gt_pose, gt_image)
+                #cv2.imwrite(f"output/{self.name}/{index}_pred.jpg", cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
+                #cv2.imwrite(f"output/{self.name}/{index}_gt.jpg", cv2.cvtColor(gt_image, cv2.COLOR_RGB2BGR))
+            except:
+                print(f"Failed to process image {image_path}")
+                fail_cases += 1
+                continue
             metrics["roll"].append(self.mae(gt_pose.roll, pred_pose.roll))
             metrics["pitch"].append(self.mae(gt_pose.pitch, pred_pose.pitch))
             metrics["yaw"].append(self.mae(gt_pose.yaw, pred_pose.yaw))
@@ -288,7 +296,7 @@ def main(
     evaluators = [AFLWEvaluator(data_dir=aflw_dir, model_name=model_name, checkpoint=checkpoint)]
     if biwi_dir is not None:
         evaluators.append(BIWIEvaluator(data_dir=biwi_dir, model_name=model_name, checkpoint=checkpoint))
-    for evaluator in evaluators[1:]:
+    for evaluator in evaluators:
         evaluator()
 
 

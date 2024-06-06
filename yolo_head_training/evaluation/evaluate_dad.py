@@ -21,6 +21,7 @@ from evaluation.draw_utils import draw_3d_landmarks, get_relative_path
 
 HEAD_INDICES = np.load(str(get_relative_path("../yolo_head/flame_indices/head_indices.npy", __file__)),
                           allow_pickle=True)[()]
+print(HEAD_INDICES.shape)
 
 MeshArrays = namedtuple(
     "MeshArrays",
@@ -235,6 +236,7 @@ class PinataEvaluator:
     def __call__(self, *args, **kwargs) -> Dict[str, float]:
         index = -1
         fail_cases = 0
+        os.makedirs("test_dad", exist_ok=True)
         for annotation in tqdm.tqdm(self.test_samples):
             attributes = annotation.attributes
             image = self.read_img(os.path.join(self.base_path, annotation.image_path))
@@ -243,9 +245,13 @@ class PinataEvaluator:
             if predictions is None:
                 fail_cases += 1
                 continue
-            #image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            #gt_image = image.copy()
+            #gt_landmarks = annotation.landmarks_2d(image_shape=image.shape[:2])
+            #gt_image = draw_3d_landmarks(gt_landmarks, gt_image)
             #image = draw_3d_landmarks(predictions.predicted_2d_vertices.reshape(-1, 2), image)
-            #cv2.imwrite(f"test_dad/{index}.jpg", cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
+            #cv2.imwrite(f"test_dad/{index}_pred.jpg", cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
+            #cv2.imwrite(f"test_dad/{index}_gt.jpg", cv2.cvtColor(gt_image, cv2.COLOR_RGB2BGR))
             gt_vertices_68_2d = annotation.landmarks_68_2d(image_shape=image.shape[:2])
             rotation_mat = rot_mat_from_6dof(flame_params.rotation)[0].numpy()
             rot_180 = np.array([[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]])

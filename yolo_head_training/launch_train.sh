@@ -7,7 +7,7 @@
 #SBATCH --gres=gpu:4
 #SBATCH --ntasks-per-node=4
 #SBATCH --cpus-per-task=8
-#SBATCH --exclude=gnodek5
+#SBATCH --nodelist=gnodem4,gnodeg3
 #SBATCH --constraint=gmem48G
 ##SBATCH --mail-user=okupyn@robots.ox.ac.uk
 ##SBATCH --mail-type=START,END,FAIL,ARRAY_TASKS
@@ -20,7 +20,7 @@ export OMP_NUM_THREADS=16
 export NCCL_DEBUG=INFO
 date +"%R starting script"
 cd /users/okupyn/head_detector/yolo_head_training || exit
-torchrun --nproc_per_node=4 train.py --config-name=yolo_heads_m_large_orest num_gpus=4 multi_gpu=DDP training_hyperparams.resume=True experiment_suffix='full_loss'
+torchrun --nproc_per_node=4 train.py --config-name=yolo_heads_l_small_eugene dataset_params.train_dataset_params.data_dir=/work/okupyn/VGGHead/small dataset_params.val_dataset_params.data_dir=/work/okupyn/VGGHead/small training_hyperparams=only_2d_and_rpy num_gpus=4 multi_gpu=DDP experiment_suffix='small_rpy_2d'
 
 
 date +"%R slurm job done"
