@@ -80,7 +80,6 @@ class MeshPadIfNeeded(AbstractKeypointTransform):
 
     def get_equivalent_preprocessing(self) -> List:
         if self.padding_mode == "bottom_right":
-            return [{"MeshBottomRightPadding": {"output_shape": (self.min_height, self.min_width), "pad_value": self.image_pad_value}}]
+            return [{Processings.KeypointsBottomRightPadding: {"output_shape": (self.min_height, self.min_width), "pad_value": self.image_pad_value}}]
         else:
-            raise RuntimeError(f"MeshPadIfNeeded with padding_mode={self.padding_mode} is not implemented.")
-
+            raise RuntimeError(f"KeypointsPadIfNeeded with padding_mode={self.padding_mode} is not implemented.")
