@@ -6,14 +6,8 @@ import torch
 import torch.nn
 import torchvision
 from scipy.optimize import linear_sum_assignment
-from super_gradients.common.registry import register_metric
-from super_gradients.module_interfaces import AbstractPoseEstimationPostPredictionCallback, PoseEstimationPredictions
 from super_gradients.training.metrics.pose_estimation_utils import compute_oks
 from torch import Tensor
-from torchmetrics import Metric
-
-
-from yolo_head.flame import FLAMELayer, FLAME_CONSTS, FlameParams
 
 
 

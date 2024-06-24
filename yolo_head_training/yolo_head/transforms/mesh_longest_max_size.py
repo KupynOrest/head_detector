@@ -4,7 +4,6 @@ from typing import List
 import cv2
 import numpy as np
 
-from super_gradients.common.object_names import Transforms, Processings
 from super_gradients.common.registry import register_transform
 from super_gradients.training.transforms.keypoints.abstract_keypoints_transform import AbstractKeypointTransform
 
@@ -79,4 +78,4 @@ class MeshLongestMaxSize(AbstractKeypointTransform):
         )
 
     def get_equivalent_preprocessing(self) -> List:
-        return [{Processings.KeypointsLongestMaxSizeRescale: {"output_shape": (self.max_height, self.max_width)}}]
+        return [{"MeshLongestMaxSizeRescale": {"output_shape": (self.max_height, self.max_width)}}]

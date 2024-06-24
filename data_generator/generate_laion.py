@@ -2,7 +2,6 @@ import os
 from os import environ
 import json
 import uuid
-import random
 from typing import Optional, List, Tuple
 
 import cv2
@@ -78,10 +77,6 @@ class DataGenerator:
                 if self.caption_processor.contains_person(caption):
                     continue
                 caption = self.caption_processor.add_ethnic_labels(caption)
-                if random.random() < 0.5:
-                    caption = f"{caption}, ultra highres, head looking up"
-                else:
-                    caption = f"{caption}, ultra highres, head looking down"
                 image = self.pipeline(
                     caption,
                     negative_prompt=NEGATIVE_PROMPT,
@@ -91,11 +86,8 @@ class DataGenerator:
                     guidance_scale=7.0,
                 ).images[0]
                 if self.safety_checker(np.array(image)):
-                    print(f"Unsafe content detected - {image_path}")
                     continue
-                print(f"Saving to {os.path.join(save_dir, folder_name, 'images', f'{filename}.jpg')}")
                 image.save(os.path.join(save_dir, folder_name, "images", f"{filename}.jpg"))
-                image.save(os.path.join("/work/okupyn/pitch_test", f"{filename}.jpg"))
             except Exception as e:
                 print(f"Error: {e}")
                 pass

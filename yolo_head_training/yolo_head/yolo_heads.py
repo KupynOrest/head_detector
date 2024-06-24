@@ -1,5 +1,7 @@
-from typing import Union, Optional, Tuple
+from typing import Union, Optional, Tuple, Any
 
+import torch
+from torch import Tensor
 from omegaconf import DictConfig
 from super_gradients.common.decorators.factory_decorator import resolve_param
 from super_gradients.common.factories.processing_factory import ProcessingFactory
@@ -10,76 +12,73 @@ from super_gradients.training.processing.processing import Processing
 from super_gradients.training.utils import HpmStruct
 
 from yolo_head.yolo_heads_post_prediction_callback import YoloHeadsPostPredictionCallback
+from yolo_head.exportable_mesh_model import ExportableMeshEstimationModel, AbstractMeshDecodingModule
 
 
-# class YoloNASPoseDecodingModule(AbstractPoseEstimationDecodingModule):
-#     __constants__ = ["num_pre_nms_predictions"]
-#
-#     def __init__(
-#         self,
-#         num_pre_nms_predictions: int = 1000,
-#     ):
-#         super().__init__()
-#         self.num_pre_nms_predictions = num_pre_nms_predictions
-#
-#     @torch.jit.ignore
-#     def infer_total_number_of_predictions(self, inputs: Any) -> int:
-#         """
-#
-#         :param inputs: YoloNASPose model outputs
-#         :return:
-#         """
-#         if torch.jit.is_tracing():
-#             pred_bboxes_xyxy, pred_bboxes_conf, pred_pose_coords, pred_pose_scores = inputs
-#         else:
-#             pred_bboxes_xyxy, pred_bboxes_conf, pred_pose_coords, pred_pose_scores = inputs[0]
-#
-#         return pred_bboxes_xyxy.size(1)
-#
-#     def get_num_pre_nms_predictions(self) -> int:
-#         return self.num_pre_nms_predictions
-#
-#     def forward(self, inputs: Tuple[Tuple[Tensor, Tensor], Tuple[Tensor, ...]]):
-#         """
-#         Decode YoloNASPose model outputs into bounding boxes, confidence scores and pose coordinates and scores
-#
-#         :param inputs: YoloNASPose model outputs
-#         :return: Tuple of (pred_bboxes, pred_scores, pred_joints)
-#         - pred_bboxes: [Batch, num_pre_nms_predictions, 4] Bounding of associated with pose in XYXY format
-#         - pred_scores: [Batch, num_pre_nms_predictions, 1] Confidence scores [0..1] for entire pose
-#         - pred_joints: [Batch, num_pre_nms_predictions, Num Joints, 3] Joints in (x,y,confidence) format
-#         """
-#         if torch.jit.is_tracing():
-#             pred_bboxes_xyxy, pred_bboxes_conf, pred_pose_coords, pred_pose_scores = inputs
-#         else:
-#             pred_bboxes_xyxy, pred_bboxes_conf, pred_pose_coords, pred_pose_scores = inputs[0]
-#
-#         nms_top_k = self.num_pre_nms_predictions
-#         batch_size, num_anchors, _ = pred_bboxes_conf.size()
-#
-#         topk_candidates = torch.topk(pred_bboxes_conf, dim=1, k=nms_top_k, largest=True, sorted=True)
-#
-#         offsets = num_anchors * torch.arange(batch_size, device=pred_bboxes_conf.device)
-#         indices_with_offset = topk_candidates.indices + offsets.reshape(batch_size, 1, 1)
-#         flat_indices = torch.flatten(indices_with_offset)
-#
-#         pred_poses_and_scores = torch.cat([pred_pose_coords, pred_pose_scores.unsqueeze(3)], dim=3)
-#
-#         output_pred_bboxes = pred_bboxes_xyxy.reshape(-1, pred_bboxes_xyxy.size(2))[flat_indices, :].reshape(
-#             pred_bboxes_xyxy.size(0), nms_top_k, pred_bboxes_xyxy.size(2)
-#         )
-#         output_pred_scores = pred_bboxes_conf.reshape(-1, pred_bboxes_conf.size(2))[flat_indices, :].reshape(
-#             pred_bboxes_conf.size(0), nms_top_k, pred_bboxes_conf.size(2)
-#         )
-#         output_pred_joints = pred_poses_and_scores.reshape(-1, pred_poses_and_scores.size(2), 3)[flat_indices, :, :].reshape(
-#             pred_poses_and_scores.size(0), nms_top_k, pred_poses_and_scores.size(2), pred_poses_and_scores.size(3)
-#         )
-#
-#         return output_pred_bboxes, output_pred_scores, output_pred_joints
+class VGGHeadDecodingModule(AbstractMeshDecodingModule):
+    __constants__ = ["num_pre_nms_predictions"]
+
+    def __init__(
+        self,
+        num_pre_nms_predictions: int = 1000,
+    ):
+        super().__init__()
+        self.num_pre_nms_predictions = num_pre_nms_predictions
+
+    @torch.jit.ignore
+    def infer_total_number_of_predictions(self, inputs: Any) -> int:
+        """
+
+        :param inputs: YoloNASPose model outputs
+        :return:
+        """
+        predictions = inputs[0]
+        pred_bboxes_xyxy = predictions.boxes_xyxy
+
+        return pred_bboxes_xyxy.size(1)
+
+    def get_num_pre_nms_predictions(self) -> int:
+        return self.num_pre_nms_predictions
+
+    def forward(self, inputs: Tuple[Tuple[Tensor, Tensor], Tuple[Tensor, ...]]):
+        """
+        Decode YoloNASPose model outputs into bounding boxes, confidence scores and pose coordinates and scores
+
+        :param inputs: YoloNASPose model outputs
+        :return: Tuple of (pred_bboxes, pred_scores, pred_joints)
+        - pred_bboxes: [Batch, num_pre_nms_predictions, 4] Bounding of associated with pose in XYXY format
+        - pred_scores: [Batch, num_pre_nms_predictions, 1] Confidence scores [0..1] for entire pose
+        - pred_joints: [Batch, num_pre_nms_predictions, Num Joints, 3] Joints in (x,y,confidence) format
+        """
+        predictions = inputs[0]
+        pred_bboxes_xyxy = predictions.boxes_xyxy
+        pred_bboxes_conf = predictions.scores
+        flame_params = predictions.flame_params
+
+        nms_top_k = self.num_pre_nms_predictions
+        batch_size, num_anchors, _ = pred_bboxes_conf.size()
+
+        topk_candidates = torch.topk(pred_bboxes_conf, dim=1, k=nms_top_k, largest=True, sorted=True)
+
+        offsets = num_anchors * torch.arange(batch_size, device=pred_bboxes_conf.device)
+        indices_with_offset = topk_candidates.indices + offsets.reshape(batch_size, 1, 1)
+        flat_indices = torch.flatten(indices_with_offset)
+
+        output_pred_bboxes = pred_bboxes_xyxy.reshape(-1, pred_bboxes_xyxy.size(2))[flat_indices, :].reshape(
+            pred_bboxes_xyxy.size(0), nms_top_k, pred_bboxes_xyxy.size(2)
+        )
+        output_pred_scores = pred_bboxes_conf.reshape(-1, pred_bboxes_conf.size(2))[flat_indices, :].reshape(
+            pred_bboxes_conf.size(0), nms_top_k, pred_bboxes_conf.size(2)
+        )
+        output_pred_flame = flame_params.reshape(-1, flame_params.size(2))[flat_indices, :].reshape(
+            flame_params.size(0), nms_top_k, flame_params.size(2)
+        )
+
+        return output_pred_bboxes, output_pred_scores, output_pred_flame
 
 
 @register_model()
-class YoloHeads(CustomizableDetector, SupportsInputShapeCheck):
+class YoloHeads(CustomizableDetector, ExportableMeshEstimationModel, SupportsInputShapeCheck):
 
     def __init__(
         self,
@@ -110,6 +109,9 @@ class YoloHeads(CustomizableDetector, SupportsInputShapeCheck):
         self._default_nms_iou = None
         self._default_pre_nms_max_predictions = None
         self._default_post_nms_max_predictions = None
+
+    def get_decoding_module(self, num_pre_nms_predictions: int, **kwargs) -> AbstractMeshDecodingModule:
+        return VGGHeadDecodingModule(num_pre_nms_predictions)
 
     @classmethod
     def get_post_prediction_callback(

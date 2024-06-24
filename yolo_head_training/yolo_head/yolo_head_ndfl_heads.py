@@ -113,7 +113,7 @@ class YoloHeadsNDFLHeads(BaseDetectionModule, SupportsReplaceNumClasses):
             heads_list[i] = factory.insert_module_param(heads_list[i], "reg_max", reg_max)
         return heads_list
 
-    def forward(self, feats: Tuple[Tensor, ...]) -> Union[YoloHeadsDecodedPredictions, Tuple[YoloHeadsDecodedPredictions, YoloHeadsRawOutputs]]:
+    def forward(self, feats: Tuple[Tensor, ...]) -> Union[Tuple[Tensor, Tensor, Tensor], Tuple[YoloHeadsDecodedPredictions, YoloHeadsRawOutputs]]:
         """
         Runs the forward for all the underlying heads and concatenate the predictions to a single result.
         :param feats: List of feature maps from the neck of different strides
@@ -168,6 +168,9 @@ class YoloHeadsNDFLHeads(BaseDetectionModule, SupportsReplaceNumClasses):
         flame_params.scale *= stride_tensor[None, None, : , 0]
         flame_params = flame_params.to_3dmm_tensor()  # [B, Num Flame Params, Anchors]
         flame_params = einops.rearrange(flame_params, "B F A -> B A F")  # Rearrange to common format where anchors comes first
+
+        if torch.jit.is_tracing():
+            return pred_bboxes, pred_scores, flame_params
 
         decoded_predictions = YoloHeadsDecodedPredictions(boxes_xyxy=pred_bboxes, scores=pred_scores, flame_params=flame_params)
 
