@@ -17,7 +17,7 @@ from yolo_head.yolo_heads_predictions import YoloHeadsPredictions
 
 
 POINT_COLOR = (255, 255, 255)
-HEAD_INDICES = np.load(str("/home/okupyn/head_detector/yolo_head_training/yolo_head/flame_indices/head_indices.npy"),
+HEAD_INDICES = np.load(str("/users/okupyn/head_detector/yolo_head_training/yolo_head/flame_indices/head_indices.npy"),
                           allow_pickle=True)[()]
 
 
@@ -121,7 +121,7 @@ def main(pattern: str, model_name="YoloHeads_M", checkpoint="C:/Develop/GitHub/V
                 keep = False
         if keep:
             filtered_triangles.append(triangle)
-    images = random.sample(images, 4000)
+    #images = random.sample(images, 4000)
     for image_path in tqdm.tqdm(images):
         image = cv2.imread(str(image_path))
         predictions, flame_params = predict_on_image(model, image)

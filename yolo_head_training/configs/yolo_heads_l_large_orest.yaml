@@ -13,7 +13,7 @@ multi_gpu: On
 num_gpus: 4
 
 training_hyperparams:
-  ema: True
+  ema: False
   initial_lr: 5e-5
   mixed_precision: True
   visualization_frequency_epochs: 1
@@ -32,11 +32,11 @@ checkpoint_params:
 
 dataset_params:
   train_dataset_params:
-    data_dir: /work/okupyn/VGGHead/large
+    data_dir: /work/okupyn/VGGHeadNew/large
     #crop_bbox_to_visible_keypoints: True
 
   val_dataset_params:
-    data_dir: /work/okupyn/VGGHead/large
+    data_dir: /work/okupyn/VGGHeadNew/large
     #crop_bbox_to_visible_keypoints: True
 
   train_dataloader_params:

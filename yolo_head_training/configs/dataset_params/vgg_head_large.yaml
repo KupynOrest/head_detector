@@ -129,7 +129,7 @@ train_dataset_params:
         max_translate: 0.1
         image_pad_value: 127
         mask_pad_value: 1
-        prob: 0.35
+        prob: 0.3
         interpolation_mode: [0, 1, 2, 3, 4]
 
     - MeshRandomRotate90:

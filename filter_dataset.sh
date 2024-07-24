@@ -6,7 +6,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
 #SBATCH --exclude=gnodee1,gnodeg3,gnodec2
-#SBATCH --array=50-99%4
+#SBATCH --array=12,16,39
 #SBATCH --constraint=gmem24G
 ##SBATCH --mail-user=okupyn@robots.ox.ac.uk
 ##SBATCH --mail-type=START,END,FAIL,ARRAY_TASKS
@@ -18,6 +18,6 @@ conda activate head_det
 date +"%R starting script"
 cd /users/okupyn/head_detector/data_generator || exit
 export PYTHONPATH=..
-python filter_pipeline.py /work/okupyn/VGGHeads /users/okupyn/RT-DETR/rtdetr_pytorch/model.onnx /work/okupyn/VGGHeadsViz
+python filter_pipeline.py /work/okupyn/VGGHeadNew/large /users/okupyn/RT-DETR/rtdetr_pytorch/model.onnx /work/okupyn/VGGHeadsViz
 
 date +"%R slurm job done"

@@ -53,6 +53,12 @@ class DetectorFilter:
         bboxes = self.detector(image)
         if len(bboxes) == 0:
             return True
+        if len(bboxes) == 1:
+            bbox = bboxes[0]
+            bbox_area = (bbox.x2 - bbox.x1) * (bbox.y2 - bbox.y1)
+            image_area = image.shape[0] * image.shape[1]
+            if bbox_area / image_area > 0.8:
+                return True
         image = np.fliplr(image)
         filpped_bboxes = self.detector(image)
         filpped_bboxes = fliplr_boxes(filpped_bboxes, image.shape)
@@ -202,20 +208,24 @@ def filter_data(data_path: str, head_detector_path: str, save_path: str) -> None
     metrics = []
     filtered_files = []
     for image_path in tqdm(images):
-        image = cv2.imread(image_path)
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        skip = False
-        for filter in single_image_filters:
-            if filter(image):
-                viz = filter.visualize(image)
-                cv2.imwrite(os.path.join(save_path, f"viz_{os.path.basename(image_path)}"), cv2.cvtColor(viz, cv2.COLOR_RGB2BGR))
-                skip = True
-                break
-        if skip:
+        try:
+            image = cv2.imread(image_path)
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            skip = False
+            for filter in single_image_filters:
+                if filter(image):
+                    viz = filter.visualize(image)
+                    cv2.imwrite(os.path.join(save_path, f"viz_{os.path.basename(image_path)}"), cv2.cvtColor(viz, cv2.COLOR_RGB2BGR))
+                    skip = True
+                    break
+            if skip:
+                filtered_files.append(os.path.split(image_path)[1])
+                continue
+            num_heads, metric = stability_metric(image)
+            metrics.append({"filename": image_path, "num_heads": num_heads, "stability_metric": metric})
+        except Exception as e:
+            print(f"Error processing {image_path}: {e}")
             filtered_files.append(os.path.split(image_path)[1])
-            continue
-        num_heads, metric = stability_metric(image)
-        metrics.append({"filename": image_path, "num_heads": num_heads, "stability_metric": metric})
     with open(os.path.join(data_path, "metrics.json"), "w") as file:
         json.dump(metrics, file)
     write_image_paths_to_txt(filtered_files, os.path.join(data_path, "files.txt"))

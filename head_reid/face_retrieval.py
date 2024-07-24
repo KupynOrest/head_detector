@@ -8,7 +8,7 @@ from deepface import DeepFace
 
 from build_face_index import EMBEDDING_SIZE
 
-DISTANCE_THRESHOLD = 0.23
+DISTANCE_THRESHOLD = 0.39
 
 
 @dataclass
@@ -28,7 +28,7 @@ class FaceRetrieval:
 
     def retrieve(self, image_path: str, num_results: int = 5) -> List[Optional[FaceVerificationResult]]:
         result = []
-        embedding_objs = DeepFace.represent(img_path=image_path, model_name="ArcFace", enforce_detection=False)
+        embedding_objs = DeepFace.represent(img_path=image_path, model_name="DeepFace", enforce_detection=False)
         for embedding_obj in embedding_objs:
             embedding = embedding_obj["embedding"]
             if embedding_obj["face_confidence"] < 0.8:

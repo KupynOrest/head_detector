@@ -1,4 +1,5 @@
 import os
+from os import environ
 import abc
 import glob
 import shutil
@@ -12,6 +13,13 @@ from pycocotools.coco import COCO
 
 from dad_3d_heads.predictor import FaceMeshPredictor
 from binary_detector import HeadDetector
+
+
+def get_folder_name() -> str:
+    if "SLURM_ARRAY_TASK_ID" not in environ:
+        return "split_00000"
+    task_id = int(environ["SLURM_ARRAY_TASK_ID"])
+    return f"split_{task_id:05d}"
 
 
 class HeadInfo:
@@ -55,12 +63,14 @@ class MeshDatasetCreator:
         os.makedirs(os.path.join(self.save_path, "images"), exist_ok=True)
         os.makedirs(os.path.join(self.save_path, "annotations"), exist_ok=True)
         for item in tqdm(self._get_list_of_items()):
+            if not os.path.exists(os.path.join(self.save_path, "annotations", item.replace("jpg", "npz"))):
+                continue
             image, filename = self._get_image(item=item)
             bboxes = self._get_bboxes(item=item, image=image)
             mesh_annotations = []
             for bbox in bboxes:
                 try:
-                    x, y, w, h = ensure_bbox_boundaries(extend_bbox(np.array(bbox), 0.25), image.shape[:2])
+                    x, y, w, h = ensure_bbox_boundaries(extend_bbox(np.array(bbox), 0.1), image.shape[:2])
                     cropped_img = image[y: y + h, x: x + w]
                     result = self.predictor(cropped_img)
                     mesh_annotations.append({
@@ -220,17 +230,31 @@ def ensure_bbox_boundaries(bbox: np.array, img_shape: Tuple[int, int]) -> np.arr
     return np.array([x1, y1, w, h]).astype("int32")
 
 
-def create_dataset(image_folder: str, wider_path: str, save_path: str):
-    dataset_creator = MeshDatasetFromWIDER(
-        image_folder=os.path.join(image_folder, "WIDER_train/images"),
-        save_path=os.path.join(save_path, "train"),
-        wider_path=os.path.join(wider_path, "wider_face_split/wider_face_train_bbx_gt.txt")
-    )
-    dataset_creator.process_dataset()
-    dataset_creator = MeshDatasetFromWIDER(
-        image_folder=os.path.join(image_folder, "WIDER_val/images"),
-        save_path=os.path.join(save_path, "valid"),
-        wider_path=os.path.join(wider_path, "wider_face_split/wider_face_val_bbx_gt.txt")
+def create_dataset(image_folder: str, save_path: str, detector_path: str):
+    # dataset_creator = MeshDatasetFromWIDER(
+    #     image_folder=os.path.join(image_folder, "WIDER_train/images"),
+    #     save_path=os.path.join(save_path, "train"),
+    #     wider_path=os.path.join(wider_path, "wider_face_split/wider_face_train_bbx_gt.txt")
+    # )
+    # dataset_creator.process_dataset()
+    # dataset_creator = MeshDatasetFromWIDER(
+    #     image_folder=os.path.join(image_folder, "WIDER_val/images"),
+    #     save_path=os.path.join(save_path, "valid"),
+    #     wider_path=os.path.join(wider_path, "wider_face_split/wider_face_val_bbx_gt.txt")
+    # )
+    # dataset_creator.process_dataset()
+    # dataset_creator = MeshDatasetFromCOCO(
+    #     image_folder=image_folder,
+    #     save_path=save_path,
+    #     coco_path=os.path.join(anno_path, "coco.json")
+    # )
+    # dataset_creator.process_dataset()
+    image_folder = os.path.join(image_folder, get_folder_name())
+    save_path = os.path.join(save_path, get_folder_name())
+    dataset_creator = MeshDatasetFromImages(
+        image_folder=image_folder,
+        save_path=save_path,
+        model_path=detector_path,
     )
     dataset_creator.process_dataset()
 
