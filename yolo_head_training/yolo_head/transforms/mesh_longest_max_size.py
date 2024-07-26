@@ -79,4 +79,4 @@ class MeshLongestMaxSize(AbstractKeypointTransform):
         )
 
     def get_equivalent_preprocessing(self) -> List:
-        return [{Processings.KeypointsLongestMaxSizeRescale: {"output_shape": (self.max_height, self.max_width)}}]
+        return [{"MeshLongestMaxSizeRescale": {"output_shape": (self.max_height, self.max_width)}}]
