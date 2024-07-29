@@ -1,0 +1,61 @@
+num_classes: 413
+
+backbone:
+  in_channels: 3
+  overlap_patch_size: [ 7, 3, 3, 3 ]
+  overlap_patch_stride: [ 4, 2, 2, 2 ]
+  overlap_patch_pad: [ 3, 1, 1, 1 ]
+  eff_self_att_reduction_ratio: [ 8, 4, 2, 1 ]
+  eff_self_att_heads: [ 1, 2, 5, 8 ]
+  encoder_embed_dims: [64, 128, 320, 512]
+  decoder_embed_dim: 768
+  encoder_layers: [3, 6, 40, 3]
+
+heads:
+  YoloHeadsNDFLHeads:
+    reg_max: 16
+    heads_list:
+      - YoloHeadsDFLHead:
+          bbox_inter_channels: 128
+          flame_inter_channels: 256
+          flame_regression_blocks: 3
+          flame_shape_inter_channels: 256
+          flame_expression_inter_channels: 128
+          flame_shape_out_channels: 128
+          flame_expression_out_channels: 64
+          flame_transformation_inter_channels: 32
+          shared_stem: False
+          width_mult: 1
+          first_conv_group_size: 0
+          stride: 8
+          reg_max: 16
+
+      - YoloHeadsDFLHead:
+          bbox_inter_channels: 256
+          flame_inter_channels: 256
+          flame_regression_blocks: 3
+          flame_shape_inter_channels: 256
+          flame_expression_inter_channels: 128
+          flame_shape_out_channels: 128
+          flame_expression_out_channels: 64
+          flame_transformation_inter_channels: 32
+          shared_stem: False
+          width_mult: 1
+          first_conv_group_size: 0
+          stride: 16
+          reg_max: 16
+
+      - YoloHeadsDFLHead:
+          bbox_inter_channels: 512
+          flame_inter_channels: 256
+          flame_regression_blocks: 3
+          flame_shape_inter_channels: 256
+          flame_expression_inter_channels: 128
+          flame_shape_out_channels: 128
+          flame_expression_out_channels: 64
+          flame_transformation_inter_channels: 32
+          shared_stem: False
+          width_mult: 1
+          first_conv_group_size: 0
+          stride: 32
+          reg_max: 16

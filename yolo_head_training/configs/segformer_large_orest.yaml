@@ -1,0 +1,45 @@
+defaults:
+  - training_hyperparams: vgg_head_train_params
+  - dataset_params: vgg_head_large
+  - arch_params: segformer_b5_yolo
+  - checkpoint_params: default_checkpoint_params
+  - _self_
+  - variable_setup
+
+architecture: SegFormerYoloHeads
+ckpt_root_dir: ./
+
+multi_gpu: On
+num_gpus: 4
+
+experiment_suffix: ""
+experiment_name: ${hydra:runtime.choices.arch_params}_${hydra:runtime.choices.dataset_params}_${experiment_suffix}
+
+checkpoint_params:
+  checkpoint_path: https://sghub.deci.ai/models/segformer_b5_cityscapes.pth
+  strict_load:
+    _target_: super_gradients.training.sg_trainer.StrictLoad
+    value: key_matching
+
+dataset_params:
+  train_dataset_params:
+    data_dir: ./VGGHead/large
+    crop_bbox_to_visible_keypoints: True
+
+  val_dataset_params:
+    data_dir: ./VGGHead/large
+    crop_bbox_to_visible_keypoints: True
+
+  train_dataloader_params:
+    persistent_workers: True
+    batch_size: 8
+
+  val_dataloader_params:
+    persistent_workers: True
+    batch_size: 8
+
+
+hydra:
+  searchpath:
+    - configs
+    - pkg://super_gradients.recipes

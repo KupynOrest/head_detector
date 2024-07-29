@@ -1,0 +1,2 @@
+include *.pkl
+recursive-include assets *

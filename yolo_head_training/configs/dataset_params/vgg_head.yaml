@@ -1,0 +1,93 @@
+defaults:
+  - 3dheads_common_dataset_params
+  - _self_
+
+# This is a shortcut parameter to set size of training & validation images.
+image_size: 640
+dataset_params_suffix: "small_${dataset_params.image_size}"
+
+train_dataset_params:
+  data_dir: g:/VGGHead/train
+  num_joints: ${dataset_params.num_joints}
+  mode: train
+  transforms:
+    - KeypointsBrightnessContrast:
+        brightness_range: [ 0.8, 1.2 ]
+        contrast_range: [ 0.8, 1.2 ]
+        prob: 1.0
+
+    - KeypointsHSV:
+        hgain: 20
+        sgain: 20
+        vgain: 20
+        prob: 1.0
+
+    - MeshRandomAffineTransform:
+        max_rotation: 45
+        min_scale: 0.5
+        max_scale: 2.0
+        max_translate: 0.1
+        image_pad_value: 127
+        mask_pad_value: 1
+        prob: 0.5
+        interpolation_mode: [0, 1, 2, 3, 4]
+
+    - MeshRandomRotate90:
+        prob: 0.5
+
+#    - KeypointsMosaic:
+#        prob: 0.5
+
+    - MeshLongestMaxSize:
+        max_height: ${dataset_params.image_size}
+        max_width: ${dataset_params.image_size}
+
+    - MeshPadIfNeeded:
+        min_height: ${dataset_params.image_size}
+        min_width: ${dataset_params.image_size}
+        image_pad_value: [127, 127, 127]
+        padding_mode: center
+
+    - KeypointsImageStandardize:
+        max_value: 255
+
+    - KeypointsRemoveSmallObjects:
+        min_instance_area: 1
+        min_visible_keypoints: 1
+
+
+val_dataset_params:
+  data_dir: g:/VGGHead/val
+  num_joints: ${dataset_params.num_joints}
+  mode: val
+  transforms:
+    - MeshLongestMaxSize:
+        max_height: ${dataset_params.image_size}
+        max_width: ${dataset_params.image_size}
+
+    - MeshPadIfNeeded:
+        min_height: ${dataset_params.image_size}
+        min_width: ${dataset_params.image_size}
+        image_pad_value: 127
+        padding_mode: bottom_right
+
+    - KeypointsImageStandardize:
+        max_value: 255
+
+
+train_dataloader_params:
+  dataset: DAD3DHeadsDataset
+  shuffle: True
+  batch_size: 48
+  num_workers: 8
+  drop_last: True
+  pin_memory: False
+  collate_fn: VGGHeadCollateFN
+
+val_dataloader_params:
+  dataset: DAD3DHeadsDataset
+  batch_size: 48
+  num_workers: 8
+  drop_last: False
+  pin_memory: False
+  collate_fn: VGGHeadCollateFN
