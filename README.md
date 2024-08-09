@@ -10,6 +10,7 @@
 <a href='https://www.robots.ox.ac.uk/~vgg/research/vgg-heads/'><img src='https://img.shields.io/badge/Project-Page-green'></a>
 <a href='https://arxiv.org/abs/2407.18245'><img src='https://img.shields.io/badge/arXiv Paper-red'></a>
 <a href='https://huggingface.co/spaces/okupyn/vgg_heads'><img src='https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Spaces-blue'></a>
+<a href='https://huggingface.co/okupyn/head-mesh-controlnet-xl'><img src='https://img.shields.io/badge/%F0%9F%A4%97%20ControlNet%20XL-blue'></a>
 [![Model](https://img.shields.io/badge/Model-Weights-blue)](https://huggingface.co/okupyn/vgg_heads)
 
 </div>
@@ -59,7 +60,8 @@ To test VGGHeads model on your own images simply use this code:
 
 Coming soon
 
-## Release
+## News
+- [2024/08/09] 🔥 We release VGGHeads_L Checkpoint and [Mesh ControlNet](https://huggingface.co/okupyn/head-mesh-controlnet-xl)
 - [2024/07/26] 🔥 We release the initial version of the codebase, the paper, project webpage and an image demo!! 
 
 
