@@ -1,3 +1,4 @@
+import os
 from typing import Union
 
 import torch
@@ -7,6 +8,10 @@ import torch.nn.functional as F
 from scipy.spatial.transform import Rotation
 
 from head_detector.head_info import RPY
+
+
+def get_relative_path(x: str, rel_to: str) -> str:
+    return os.path.join(os.path.dirname(rel_to), x)
 
 
 def rot_mat_from_6dof(v: torch.Tensor) -> torch.Tensor:

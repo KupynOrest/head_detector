@@ -191,19 +191,22 @@ class YoloHeadsNDFLHeads(BaseDetectionModule, SupportsReplaceNumClasses):
     def out_channels(self):
         return None
 
-    def _generate_anchors(self, feats):
+    def _generate_anchors(self, feats=None, dtype=None, device=None):
         # just use in eval time
         anchor_points = []
         stride_tensor = []
 
-        dtype = feats[0].dtype
-        device = feats[0].device
+        dtype = dtype or feats[0].dtype
+        device = device or feats[0].device
 
         for i, stride in enumerate(self.fpn_strides):
-            _, _, h, w = feats[i].shape
-
-            shift_x = torch.arange(end=w, device=device) + self.grid_cell_offset
-            shift_y = torch.arange(end=h, device=device) + self.grid_cell_offset
+            if feats is not None:
+                _, _, h, w = feats[i].shape
+            else:
+                h = int(self.eval_size[0] / stride)
+                w = int(self.eval_size[1] / stride)
+            shift_x = torch.arange(end=w) + self.grid_cell_offset
+            shift_y = torch.arange(end=h) + self.grid_cell_offset
             if torch_version_is_greater_or_equal(1, 10):
                 shift_y, shift_x = torch.meshgrid(shift_y, shift_x, indexing="ij")
             else:
@@ -214,4 +217,8 @@ class YoloHeadsNDFLHeads(BaseDetectionModule, SupportsReplaceNumClasses):
             stride_tensor.append(torch.full([h * w, 1], stride, dtype=dtype))
         anchor_points = torch.cat(anchor_points)
         stride_tensor = torch.cat(stride_tensor)
+
+        if device is not None:
+            anchor_points = anchor_points.to(device)
+            stride_tensor = stride_tensor.to(device)
         return anchor_points, stride_tensor

@@ -1,15 +1,12 @@
 from typing import Optional, Tuple
-import os
+
 from math import sqrt, cos, sin
 
 import cv2
 import numpy as np
 
 from head_detector.head_info import HeadMetadata
-
-
-def get_relative_path(x: str, rel_to: str) -> str:
-    return os.path.join(os.path.dirname(rel_to), x)
+from head_detector.utils import get_relative_path
 
 
 FACE_INDICES = np.load(str(get_relative_path("assets/flame_indices/face.npy", __file__)),

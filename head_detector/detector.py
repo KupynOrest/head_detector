@@ -16,7 +16,7 @@ REPO_ID = "okupyn/vgg_heads"
 
 
 class HeadDetector:
-    def __init__(self, model: str = "vgg_heads_m", image_size: int = 640):
+    def __init__(self, model: str = "vgg_heads_l", image_size: int = 640):
         self._image_size = image_size
         self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self._flame = FLAMELayer().to(self._device)

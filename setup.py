@@ -2,6 +2,9 @@ import os
 import re
 import ast
 from setuptools import setup, find_packages
+from distutils.core import Extension
+import numpy
+from Cython.Distutils import build_ext
 
 
 def parse_requirements(filename):
@@ -43,4 +46,17 @@ if __name__ == "__main__":
             '': ['*.pkl'],
             'head_detector': ['assets/*', 'assets/flame_indices/*'],
         },
+        cmdclass={"build_ext": build_ext},
+        ext_modules=[
+            Extension(
+                "Sim3DR_Cython",
+                sources=[
+                    "./head_detector/Sim3DR/lib/rasterize_kernel.cpp",
+                    "./head_detector/Sim3DR/lib/rasterize.pyx",
+                ],
+                language="c++",
+                include_dirs=[numpy.get_include()],
+                extra_compile_args=["-std=c++11"],
+            )
+        ],
     )
