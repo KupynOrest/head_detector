@@ -2,7 +2,6 @@
 
 # VGGHeads: A Large-Scale Synthetic Dataset for 3D Human Heads
 
-
 [**Orest Kupyn**](https://github.com/KupynOrest)<sup>13</sup> · [**Eugene Khvedchenia**](https://github.com/BloodAxe)<sup>2</sup> · [**Christian Rupprecht**](https://chrirupp.github.io/)<sup>1</sup> ·
 
 <sup>1</sup>University of Oxford · <sup>2</sup>Ukrainian Catholic University · <sup>3</sup>PiñataFarms AI
@@ -17,17 +16,18 @@
 
 VGGHeads is a large-scale fully synthetic dataset for human head detection and 3D mesh estimation with over 1 million images generated with diffusion models. A model trained only on synthetic data generalizes well to real-world and is capable of simultaneous heads detection and head meshes reconstruction from a single image in a single step.
 
-![](./images/banner.jpg)
+![banner](./images/banner.jpg)
 
 ## Installation
 
-#### Create a Conda virtual environment:
+#### Create a Conda virtual environment
 
 ```bash
 conda create --name vgg_heads python=3.10
 conda activate vgg_heads
 ```
-#### Clone the project and install the package:
+
+#### Clone the project and install the package
 
 ```bash
 git clone https://github.com/KupynOrest/head_detector.git
@@ -36,7 +36,7 @@ cd head_detector
 pip install -e ./
 ```
 
-Or simply install 
+Or simply install
 
 ```bash
 pip install git+https://github.com/KupynOrest/head_detector.git
@@ -46,14 +46,15 @@ pip install git+https://github.com/KupynOrest/head_detector.git
 
 To test VGGHeads model on your own images simply use this code:
 
-```bash
-  from head_detector import HeadDetector
-
-  detector = HeadDetector()
-  image_path = "your_image.jpg"
-  predictions = detector(image_path)
-  # predictions.heads contain a list of heads with .bbox, .vertices_3d, .head_pose params
-  predictions.draw() # draw heads on the image
+```python
+from head_detector import HeadDetector
+import cv2
+detector = HeadDetector()
+image_path = "your_image.jpg"
+predictions = detector(image_path)
+# predictions.heads contain a list of heads with .bbox, .vertices_3d, .head_pose params
+result_image = predictions.draw() # draw heads on the image
+cv2.imwrite("result.png",result_image) # save reuslt image to preview it.
 ```
 
 ## Training
@@ -61,11 +62,12 @@ To test VGGHeads model on your own images simply use this code:
 Coming soon
 
 ## News
-- [2024/08/09] 🔥 We release VGGHeads_L Checkpoint and [Mesh ControlNet](https://huggingface.co/okupyn/head-mesh-controlnet-xl)
-- [2024/07/26] 🔥 We release the initial version of the codebase, the paper, project webpage and an image demo!! 
 
+- [2024/08/09] 🔥 We release VGGHeads_L Checkpoint and [Mesh ControlNet](https://huggingface.co/okupyn/head-mesh-controlnet-xl)
+- [2024/07/26] 🔥 We release the initial version of the codebase, the paper, project webpage and an image demo!!
 
 ## Cite
+
 If you find VGGHeads useful for your research and applications, please cite us using this BibTeX:
 
 ```bibtex
@@ -90,5 +92,3 @@ This work is licensed under a
 [cc-by-nc]: https://creativecommons.org/licenses/by-nc/4.0/
 [cc-by-nc-image]: https://licensebuttons.net/l/by-nc/4.0/88x31.png
 [cc-by-nc-shield]: https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey.svg
-
-
