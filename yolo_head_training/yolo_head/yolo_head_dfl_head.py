@@ -6,7 +6,6 @@ import torch
 from torch import nn, Tensor
 
 from super_gradients.common.registry import register_detection_module
-from super_gradients.module_interfaces import SupportsReplaceNumClasses
 from super_gradients.modules import ConvBNReLU, QARepVGGBlock
 from super_gradients.modules.base_modules import BaseDetectionModule
 from super_gradients.modules.utils import width_multiplier

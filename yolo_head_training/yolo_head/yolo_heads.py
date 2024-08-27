@@ -24,6 +24,7 @@ class VGGHeadDecodingModule(AbstractMeshDecodingModule):
     ):
         super().__init__()
         self.num_pre_nms_predictions = num_pre_nms_predictions
+        self.register_buffer('max_batch', torch.arange(8192))
 
     @torch.jit.ignore
     def infer_total_number_of_predictions(self, inputs: Any) -> int:
@@ -52,7 +53,6 @@ class VGGHeadDecodingModule(AbstractMeshDecodingModule):
         """
         if torch.jit.is_tracing():
             pred_bboxes_xyxy, pred_bboxes_conf, flame_params = inputs
-            print(pred_bboxes_xyxy.size(), pred_bboxes_conf.size(), flame_params.size())
         else:
             predictions = inputs[0]
 
@@ -65,7 +65,11 @@ class VGGHeadDecodingModule(AbstractMeshDecodingModule):
 
         topk_candidates = torch.topk(pred_bboxes_conf, dim=1, k=nms_top_k, largest=True, sorted=True)
 
-        offsets = num_anchors * torch.arange(batch_size, device=pred_bboxes_conf.device)
+        if torch.jit.is_tracing():
+            batch_size = pred_bboxes_conf.shape[0]
+            offsets = num_anchors * self.max_batch[:batch_size]
+        else:
+            offsets = num_anchors * torch.arange(batch_size, device=pred_bboxes_conf.device)
         indices_with_offset = topk_candidates.indices + offsets.reshape(batch_size, 1, 1)
         flat_indices = torch.flatten(indices_with_offset)
 
@@ -128,6 +132,16 @@ class YoloHeads(CustomizableDetector, ExportableMeshEstimationModel, SupportsInp
             pre_nms_max_predictions=pre_nms_max_predictions,
             post_nms_max_predictions=post_nms_max_predictions,
         )
+
+    def prep_model_for_conversion(self, input_size: Union[tuple, list] = None, **kwargs):
+        """
+        Prepare the model to be converted to ONNX or other frameworks.
+        Typically, this function will freeze the size of layers which is otherwise flexible, replace some modules
+        with convertible substitutes and remove all auxiliary or training related parts.
+        :param input_size: [H,W]
+        """
+        h, w = input_size[-2:]
+        self.heads.cache_anchors((h, w))
 
     def get_preprocessing_callback(self, **kwargs):
         processing = self.get_processing_params()

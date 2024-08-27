@@ -23,9 +23,6 @@ class HeadDetector:
         self.model = self._read_model(model)
 
     def _read_model(self, model: str) -> torch.jit.ScriptModule:
-        #ToDo: Proper serialization for cpu
-        if not torch.cuda.is_available():
-            model = f"{model}_cpu"
         model_path = hf_hub_download(REPO_ID, f"{model}.trcd")
         loaded_model = torch.jit.load(model_path)
         loaded_model.to(self._device)
