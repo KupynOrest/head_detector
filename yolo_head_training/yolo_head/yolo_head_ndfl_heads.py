@@ -1,5 +1,5 @@
 import dataclasses
-from typing import Tuple, Union, List, Callable
+from typing import Tuple, Union, List
 
 import einops
 import super_gradients.common.factories.detection_modules_factory as det_factory
@@ -11,7 +11,8 @@ from super_gradients.modules.base_modules import BaseDetectionModule
 from super_gradients.training.models.detection_models.pp_yolo_e.pp_yolo_head import generate_anchors_for_grid_cell
 from super_gradients.training.utils import HpmStruct, torch_version_is_greater_or_equal
 from super_gradients.training.utils.bbox_utils import batch_distance2bbox
-from torch import nn, Tensor
+from super_gradients.training.utils.utils import infer_model_dtype, infer_model_device
+from torch import Tensor
 
 from yolo_head.flame import FLAME_CONSTS, FlameParams
 
@@ -154,13 +155,14 @@ class YoloHeadsNDFLHeads(BaseDetectionModule, SupportsReplaceNumClasses):
         reg_distri_list = torch.cat(reg_distri_list, dim=1)  # [B, Anchors, 4 * (self.reg_max + 1)]
         reg_dist_reduced_list = torch.cat(reg_dist_reduced_list, dim=1)  # [B, Anchors, 4]
 
-        anchor_points_inference, stride_tensor = self._generate_anchors(feats)
+        if torch.jit.is_tracing():
+            anchor_points_inference, stride_tensor = self.anchor_points, self.stride_tensor
+        else:
+            anchor_points_inference, stride_tensor = self._generate_anchors(feats)
         centers = anchor_points_inference * stride_tensor
 
         pred_scores = cls_score_list.sigmoid()
         pred_bboxes = batch_distance2bbox(anchor_points_inference, reg_dist_reduced_list) * stride_tensor  # [B, Anchors, 4]
-
-        # box_size = torch.sqrt((pred_bboxes[:, :, 3] - pred_bboxes[:, :, 1]) * (pred_bboxes[:, :, 2] - pred_bboxes[:, :, 0]))
 
         flame_params_list = torch.cat(flame_params_list, dim=-1)  # [B, Num Flame Params, Anchors]
         flame_params = FlameParams.from_3dmm(flame_params_list, FLAME_CONSTS)
@@ -190,6 +192,16 @@ class YoloHeadsNDFLHeads(BaseDetectionModule, SupportsReplaceNumClasses):
     @property
     def out_channels(self):
         return None
+
+    @torch.jit.ignore
+    def cache_anchors(self, input_size: Tuple[int, int]):
+        self.eval_size = input_size
+        device = infer_model_device(self)
+        dtype = infer_model_dtype(self)
+
+        anchor_points, stride_tensor = self._generate_anchors(dtype=dtype, device=device)
+        self.register_buffer("anchor_points", anchor_points, persistent=False)
+        self.register_buffer("stride_tensor", stride_tensor, persistent=False)
 
     def _generate_anchors(self, feats=None, dtype=None, device=None):
         # just use in eval time

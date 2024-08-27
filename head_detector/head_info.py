@@ -11,6 +11,6 @@ RPY = namedtuple("RPY", ["roll", "pitch", "yaw"])
 class HeadMetadata:
     bbox: Bbox
     score: float
-    flame_params: np.ndarray
+    flame_params: object
     vertices_3d: np.ndarray
     head_pose: RPY

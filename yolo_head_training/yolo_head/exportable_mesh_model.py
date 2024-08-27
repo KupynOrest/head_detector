@@ -437,10 +437,55 @@ class ExportableMeshEstimationModel:
                 )
 
         onnx_input = torch.randn(input_shape).to(device=device, dtype=input_image_dtype)
-        traced_model = torch.jit.trace(complete_model, onnx_input)
+        if engine == 'torch':
+            traced_model = torch.jit.trace(complete_model, onnx_input)
+            traced_model.save(output)
+        else:
+            from super_gradients.conversion.onnx.export_to_onnx import export_to_onnx
 
-        # Save the traced model to a file
-        traced_model.save(output)
+            onnx_export_kwargs = onnx_export_kwargs or {}
+            onnx_input = torch.randn(input_shape).to(device=device, dtype=input_image_dtype)
+
+            export_to_onnx(
+                model=complete_model,
+                model_input=onnx_input,
+                onnx_filename=output,
+                input_names=input_names,
+                output_names=output_names,
+                onnx_opset=onnx_export_kwargs.get("opset_version", None),
+                do_constant_folding=onnx_export_kwargs.get("do_constant_folding", True),
+                dynamic_axes=onnx_export_kwargs.get("dynamic_axes", None),
+                keep_initializers_as_inputs=onnx_export_kwargs.get("keep_initializers_as_inputs", False),
+                verbose=onnx_export_kwargs.get("verbose", False),
+            )
+
+            # Stitch ONNX graph with NMS postprocessing
+            if attach_nms_postprocessing:
+                if engine in (ExportTargetBackend.TENSORRT, ExportTargetBackend.ONNXRUNTIME):
+                    # For pose estimation models, we cannot use EfficientNMS plugin, since it does not output
+                    # indexes to keep which is necessary since we have to filter also joints.
+                    nms_attach_method = attach_onnx_pose_nms
+                else:
+                    raise KeyError(f"Unsupported engine: {engine}")
+
+                nms_attach_method(
+                    onnx_model_path=output,
+                    output_onnx_model_path=output,
+                    num_pre_nms_predictions=num_pre_nms_predictions,
+                    max_predictions_per_image=max_predictions_per_image,
+                    nms_threshold=nms_threshold,
+                    confidence_threshold=confidence_threshold,
+                    batch_size=batch_size,
+                    output_predictions_format=output_predictions_format,
+                    device=device,
+                )
+
+            if onnx_simplify:
+                model_opt, check_ok = onnxsim.simplify(output)
+                if not check_ok:
+                    raise RuntimeError(f"Failed to simplify ONNX model {output}")
+                onnx.save(model_opt, output)
+                logger.debug(f"Ran onnxsim.simplify on {output}")
 
         # Cleanup memory, not sure whether it is necessary but just in case
         gc.collect()
