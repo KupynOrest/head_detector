@@ -1,0 +1,12 @@
+git+https://github.com/KupynOrest/head_detector.git
+fire
+torch~=2.0.1
+torchvision~=0.15.2
+opencv-contrib-python-headless==4.9.0.80
+huggingface_hub==0.20.3
+Pillow==10.2.0
+numpy==1.23.5
+smplx==0.1.26
+chumpy==0.70
+scipy==1.10.0
+einops==0.8.0
