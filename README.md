@@ -55,6 +55,17 @@ To test VGGHeads model on your own images simply use this code:
   predictions.draw() # draw heads on the image
 ```
 
+## Gradio Demo
+
+We also provide a Gradio <a href='https://github.com/gradio-app/gradio'><img src='https://img.shields.io/github/stars/gradio-app/gradio'></a> demo, which you can run locally:
+
+```bash
+cd gradio
+pip install -r requirements.txt
+python app.py
+```
+You can specify the `--server_port`, `--share`, `--server_name` arguments to satisfy your needs!
+
 ## Training
 
 Coming soon
