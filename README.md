@@ -30,12 +30,22 @@ VGGHeads is a large-scale fully synthetic dataset for human head detection and 3
 To download the VGGHeads dataset, you have two options:
 
 1. Torrent download (preferred method):
+ <a href='https://academictorrents.com/docs/downloading.html'>How To Download</a>
+```bash
+pip install academictorrents
+at-get 1ac36f16386061685ed303dea6f0d6179d2e2121
+```
+or use  <a href='https://aria2.github.io/'>aria2c</a>
 
 ```bash
-wget https://academictorrents.com/download/1ac36f16386061685ed303dea6f0d6179d2e2121.torrent
+aria2c --seed-time=0 --max-overall-download-limit=10M --file-allocation=none https://academictorrents.com/download/1ac36f16386061685ed303dea6f0d6179d2e2121.torrent
 ```
-Then use your preferred torrent client to download the dataset using the obtained .torrent file.
-We recommend using the torrent method as it's typically faster and helps reduce the load on our servers. If you don't have a torrent client installed, you may need to set one up before using this method.
+
+
+
+<a href='https://academictorrents.com/download/1ac36f16386061685ed303dea6f0d6179d2e2121.torrent'>Full Torrent Link</a>
+
+We recommend using the torrent method as it's typically faster and helps reduce the load on our servers.
 
 2. Direct download:
    
