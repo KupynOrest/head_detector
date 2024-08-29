@@ -27,8 +27,18 @@ VGGHeads is a large-scale fully synthetic dataset for human head detection and 3
 
 ### 1. Download the Dataset
 
-To download the VGGHeads dataset, use the following command:
+To download the VGGHeads dataset, you have two options:
 
+1. Torrent download (preferred method):
+
+```bash
+wget https://academictorrents.com/download/1ac36f16386061685ed303dea6f0d6179d2e2121.torrent
+```
+Then use your preferred torrent client to download the dataset using the obtained .torrent file.
+We recommend using the torrent method as it's typically faster and helps reduce the load on our servers. If you don't have a torrent client installed, you may need to set one up before using this method.
+
+2. Direct download:
+   
 ```bash
 wget https://thor.robots.ox.ac.uk/vgg-heads/VGGHeads.tar
 ```
