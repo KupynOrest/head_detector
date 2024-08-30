@@ -6,14 +6,9 @@ import cv2
 import numpy as np
 
 from head_detector.head_info import HeadMetadata
-from head_detector.utils import get_relative_path
+from head_detector.utils import HEAD_INDICES, FACE_INDICES, TRIANGLES
 
 
-FACE_INDICES = np.load(str(get_relative_path("assets/flame_indices/face.npy", __file__)),
-                          allow_pickle=True)[()]
-HEAD_INDICES = np.load(str(get_relative_path("assets/flame_indices/head_indices.npy", __file__)),
-                          allow_pickle=True)[()]
-TRIANGLES = np.loadtxt(get_relative_path("assets/triangles.txt", __file__), delimiter=',').astype(np.int32)
 POINT_COLOR = (255, 255, 255)
 
 
