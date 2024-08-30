@@ -19,6 +19,7 @@ VGGHeads is a large-scale fully synthetic dataset for human head detection and 3
 ![banner](./images/banner.jpg)
 
 ## News
+- [2024/08/30] 🔥 Release Version 0.1.0. Added examples of Head Alignment and Saving Meshes as .obj
 - [2024/08/29] 🔥🔥 We release the dataset, training instructions and ONNX weights!!
 - [2024/08/09] 🔥 We release VGGHeads_L Checkpoint and [Mesh ControlNet](https://huggingface.co/okupyn/head-mesh-controlnet-xl)
 - [2024/07/26] 🔥 We release the initial version of the codebase, the paper, project webpage and an image demo!!
