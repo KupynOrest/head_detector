@@ -125,8 +125,75 @@ image_path = "your_image.jpg"
 predictions = detector(image_path)
 # predictions.heads contain a list of heads with .bbox, .vertices_3d, .head_pose params
 result_image = predictions.draw() # draw heads on the image
-cv2.imwrite("result.png",result_image) # save reuslt image to preview it.
+cv2.imwrite("result.png",result_image) # save result image to preview it.
 ```
+
+### Exporting Head Meshes
+
+You can export head meshes as OBJ files using the `save_meshes` method:
+
+```python
+# After getting predictions
+save_folder = "path/to/save/folder"
+predictions.save_meshes(save_folder)
+```
+
+This will save individual OBJ files for each detected head in the specified folder.
+
+### Getting Aligned Head Crops
+
+To obtain aligned head crops, use the `get_aligned_heads` method:
+
+```python
+# After getting predictions
+aligned_heads = predictions.get_aligned_heads()
+
+# Process or save aligned head crops
+for i, head in enumerate(aligned_heads):
+    cv2.imwrite(f"aligned_head_{i}.png", head)
+```
+
+This returns a list of aligned head crops that you can further process or save.
+
+### Extended Example
+
+Here's a complete example incorporating all features:
+
+```python
+from head_detector import HeadDetector
+import cv2
+import os
+
+# Initialize the detector
+detector = HeadDetector()
+
+# Specify the path to your image
+image_path = "your_image.jpg"
+
+# Get predictions
+predictions = detector(image_path)
+
+# Draw heads on the image
+result_image = predictions.draw()
+cv2.imwrite("result.png", result_image)
+
+# Save head meshes
+save_folder = "head_meshes"
+os.makedirs(save_folder, exist_ok=True)
+predictions.save_meshes(save_folder)
+
+# Get and save aligned head crops
+aligned_heads = predictions.get_aligned_heads()
+for i, head in enumerate(aligned_heads):
+    cv2.imwrite(f"aligned_head_{i}.png", head)
+
+print(f"Detected {len(predictions.heads)} heads.")
+print(f"Result image saved as 'result.png'")
+print(f"Head meshes saved in '{save_folder}' folder")
+print(f"Aligned head crops saved as 'aligned_head_*.png'")
+```
+
+This extended example demonstrates how to use all the features of the VGGHeads model, including basic head detection, drawing results, exporting head meshes, and obtaining aligned head crops.
 
 Additionally, the ONNX weights are available at <a href='https://huggingface.co/okupyn/vgg_heads/tree/main'>HuggingFace</a>. The example of the inference can be found at: <a href='https://colab.research.google.com/drive/1EJn9dPdlX2qIWrZok9LF185ZJwAGOr9Y'>Colab</a>
 
