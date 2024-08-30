@@ -6,10 +6,10 @@ import numpy as np
 from PIL import Image
 from huggingface_hub import hf_hub_download
 
-from head_detector.head_info import HeadMetadata, Bbox
+from head_detector.head_info import HeadMetadata, Bbox, FlameParams
 from head_detector.detection_result import PredictionResult
 from head_detector.utils import nms, calculate_rpy
-from head_detector.flame import FlameParams, FLAMELayer, reproject_spatial_vertices
+from head_detector.flame import FLAMELayer, reproject_spatial_vertices
 
 
 REPO_ID = "okupyn/vgg_heads"
@@ -76,6 +76,7 @@ class HeadDetector:
         flame_params = flame_params.detach().cpu()
         for bbox, score, params, vertices in zip(bboxes_xyxy, scores, flame_params, final_3d_pts):
             params = FlameParams.from_3dmm(params.unsqueeze(0))
+            params.scale = params.scale / scale
             box = Bbox(x=bbox[0], y=bbox[1], w=bbox[2] - bbox[0], h=bbox[3] - bbox[1])
             result.append(
                 HeadMetadata(

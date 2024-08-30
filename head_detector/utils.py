@@ -1,17 +1,120 @@
 import os
-from typing import Union
+from typing import Union, Tuple
 
+import cv2
 import torch
 import torchvision
 import numpy as np
 import torch.nn.functional as F
 from scipy.spatial.transform import Rotation
 
-from head_detector.head_info import RPY
+from head_detector.head_info import RPY, FlameParams, Bbox
 
 
 def get_relative_path(x: str, rel_to: str) -> str:
     return os.path.join(os.path.dirname(rel_to), x)
+
+
+IMAGE_SIZE = 640
+FACE_INDICES = np.load(str(get_relative_path("assets/flame_indices/face.npy", __file__)),
+                          allow_pickle=True)[()]
+HEAD_INDICES = np.load(str(get_relative_path("assets/flame_indices/head_indices.npy", __file__)),
+                          allow_pickle=True)[()]
+TRIANGLES = np.loadtxt(get_relative_path("assets/triangles.txt", __file__), delimiter=',').astype(np.int32)
+
+
+def refined_head_bbox(vertices: np.ndarray) -> Bbox:
+    points = []
+    points.extend(np.take(vertices, np.array(HEAD_INDICES), axis=0))
+    points = np.array(points)
+    x = min(points[:, 0])
+    y = min(points[:, 1])
+    x1 = max(points[:, 0])
+    y1 = max(points[:, 1])
+    x, y, x1, y1 = list(map(int, [x, y, x1, y1]))
+    return Bbox(x=x, y=y, w=x1 - x, h=y1 - y)
+
+
+def extend_bbox(bbox: np.array, offset: Union[Tuple[float, ...], float] = 0.1) -> np.array:
+    """
+    Increases bbox dimensions by offset*100 percent on each side.
+
+    IMPORTANT: Should be used with ensure_bbox_boundaries, as might return negative coordinates for x_new, y_new,
+    as well as w_new, h_new that are greater than the image size the bbox is extracted from.
+
+    :param bbox: [x, y, w, h]
+    :param offset: (left, right, top, bottom), or (width_offset, height_offset), or just single offset that specifies
+    fraction of spatial dimensions of bbox it is increased by.
+
+    For example, if bbox is a square 100x100 pixels, and offset is 0.1, it means that the bbox will be increased by
+    0.1*100 = 10 pixels on each side, yielding 120x120 bbox.
+
+    :return: extended bbox, [x_new, y_new, w_new, h_new]
+    """
+    x, y, w, h = bbox
+
+    if isinstance(offset, tuple):
+        if len(offset) == 4:
+            left, right, top, bottom = offset
+        elif len(offset) == 2:
+            w_offset, h_offset = offset
+            left = right = w_offset
+            top = bottom = h_offset
+    else:
+        left = right = top = bottom = offset
+
+    return np.array([x - w * left, y - h * top, w * (1.0 + right + left), h * (1.0 + top + bottom)]).astype("int32")
+
+
+def extend_to_rect(bbox: np.array) -> np.array:
+    x, y, w, h = bbox
+    if w > h:
+        diff = w - h
+        return np.array([x, y - diff // 2, w, w])
+    else:
+        diff = h - w
+        return np.array([x - diff // 2, y, h, h])
+
+
+def flame_params_skull_center(flame_params: FlameParams, image: np.ndarray) -> Tuple[int, int]:
+    h, w = image.shape[:2]
+    scale = IMAGE_SIZE / max(image.shape[:2])
+    if h > w:
+        new_h, new_w = IMAGE_SIZE, int(w * IMAGE_SIZE / h)
+    else:
+        new_h, new_w = int(h * IMAGE_SIZE / w), IMAGE_SIZE
+    pad_w = IMAGE_SIZE - new_w
+    pad_h = IMAGE_SIZE - new_h
+    scull_center = flame_params.translation / scale
+    scull_center = scull_center[0].numpy()
+    return int(scull_center[0] - pad_w), int(scull_center[1] - pad_h)
+
+
+def get_rotation_mat(
+    img: np.ndarray, img_center: Tuple[int, int], angle: Union[float, int]
+) -> Tuple[np.ndarray, Tuple[int, int]]:
+    height, width = img.shape[:2]
+    rotation_mat = cv2.getRotationMatrix2D(img_center, angle, 1.0)
+
+    abs_cos = abs(rotation_mat[0, 0])
+    abs_sin = abs(rotation_mat[0, 1])
+    bound_w = int(height * abs_sin + width * abs_cos)
+    bound_h = int(height * abs_cos + width * abs_sin)
+
+    rotation_mat[0, 2] += bound_w / 2 - img_center[0]
+    rotation_mat[1, 2] += bound_h / 2 - img_center[1]
+    return rotation_mat, (bound_w, bound_h)
+
+
+def vertically_align(
+    img: np.ndarray, vertices: np.ndarray, flame_params, roll: float
+):
+    scull_center = flame_params_skull_center(flame_params, img)
+    rot_mat, bounds = get_rotation_mat(img, scull_center, roll)
+    vertical_img = cv2.warpAffine(img, rot_mat, bounds, flags=cv2.INTER_LINEAR)
+    vertices = np.hstack([vertices[:, :2], np.ones((vertices.shape[0], 1))])
+    rotated_landmarks = vertices @ rot_mat.T
+    return vertical_img, rotated_landmarks
 
 
 def rot_mat_from_6dof(v: torch.Tensor) -> torch.Tensor:
