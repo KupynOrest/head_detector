@@ -31,7 +31,7 @@ class SafetyClassifier:
         gpus = tf.config.experimental.list_physical_devices('GPU')
         for gpu in gpus:
             tf.config.experimental.set_memory_growth(gpu, True)
-        self.model = self._load_model("/work/okupyn/mobilenet_v2_140_224")
+        self.model = self._load_model("./mobilenet_v2_140_224")
         self.image_size = 224
 
     def _load_model(self, model_path):
