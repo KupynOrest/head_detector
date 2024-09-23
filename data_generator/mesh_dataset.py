@@ -166,9 +166,7 @@ class MeshDatasetFromImages(MeshDatasetCreator):
         files = glob.glob(f"{self.image_folder}/images/*.jpg")
         with open(f"{self.image_folder}/files.txt", 'r') as file:
             filtered_files = [line.strip() for line in file]
-        print(f"Number of all files = {len(files)}")
         files = [x for x in files if os.path.basename(x) not in filtered_files]
-        print(f"Number of filtered files = {len(files)}")
         return files
 
     def _get_image(self, item) -> Tuple[np.ndarray, str]:
@@ -227,21 +225,6 @@ def ensure_bbox_boundaries(bbox: np.array, img_shape: Tuple[int, int]) -> np.arr
     return np.array([x1, y1, w, h]).astype("int32")
 
 
-<<<<<<< HEAD
-def create_dataset(image_folder: str, wider_path: str, save_path: str):
-    dataset_creator = MeshDatasetFromWIDER(
-        image_folder=os.path.join(image_folder, "WIDER_train/images"),
-        save_path=os.path.join(save_path, "train"),
-        wider_path=os.path.join(wider_path, "wider_face_split/wider_face_train_bbx_gt.txt")
-    )
-    dataset_creator.process_dataset()
-    dataset_creator = MeshDatasetFromWIDER(
-        image_folder=os.path.join(image_folder, "WIDER_val/images"),
-        save_path=os.path.join(save_path, "valid"),
-        wider_path=os.path.join(wider_path, "wider_face_split/wider_face_val_bbx_gt.txt")
-    )
-    dataset_creator.process_dataset()
-=======
 def get_folder_name() -> str:
     if "SLURM_ARRAY_TASK_ID" not in environ:
         return "split_00000"
@@ -257,7 +240,6 @@ def create_dataset(image_folder: str, save_path: str, from_coco: bool = True, de
         image_folder = os.path.join(image_folder, folder_name)
         annotations_generator = MeshDatasetFromImages(image_folder=image_folder, save_path=os.path.join(save_path, folder_name), model_path=detector_path)
     annotations_generator.process_dataset()
->>>>>>> 6e58a95 (Evaluator + FlameGenerate)
 
 
 if __name__ == '__main__':

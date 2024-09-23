@@ -10,6 +10,7 @@ import numpy as np
 
 IMAGE_SIZE = 640
 
+
 @dataclass
 class Box:
     x1: int
